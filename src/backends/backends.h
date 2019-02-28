@@ -25,9 +25,10 @@ class IBackend
 {
 public:
     virtual func available() const -> bool = 0;
-    virtual func generateWorkspace(const WorkspaceRef& workspace) -> bool = 0;
-    virtual func launchIde(const WorkspaceRef& workspace) -> void = 0;
-    virtual func build(const WorkspaceRef& ws) -> BuildState = 0;
+    virtual func generateWorkspace(const WorkspaceRef workspace) -> bool = 0;
+    virtual func launchIde(const WorkspaceRef workspace) -> void = 0;
+    virtual func build(const WorkspaceRef ws) -> BuildState = 0;
+    virtual func buildProject(const ProjectRef p) -> BuildState = 0;
 };
 
 //----------------------------------------------------------------------------------------------------------------------

@@ -26,13 +26,54 @@ func buildProject(Workspace& ws, const Env& env) -> bool
     {
         p->name = *maybeName;
     }
-    else
-    {
-        error(env.cmdLine, stringFormat("Project at `{0}` doesn't have a name (add info.name entry to forge.ini).", env.rootPath));
-        return false;
-    }
+    else return error(env.cmdLine, stringFormat("Project at `{0}` doesn't have a name (add info.name entry to forge.ini).", env.rootPath));
 
     p->guid = generateGuid();
+
+    // Figure out application type
+    auto maybeAppType = p->config.tryGet("info.type");
+    if (maybeAppType)
+    {
+        if (maybeAppType == "lib")
+        {
+            p->appType = AppType::Library;
+        }
+        else if (maybeAppType == "dll")
+        {
+            p->appType = AppType::DynamicLibrary;
+        }
+        else if (maybeAppType == "exe")
+        {
+            p->appType = AppType::Exe;
+        }
+        else return error(env.cmdLine, stringFormat("Unknown application type.  Please check info.type entry in forge.ini for project `{0}`.", p->name));
+    }
+
+    // Figure out subsystem type
+    p->subsystemType = SubsystemType::NotRequired;
+    if (p->appType == AppType::Exe)
+    {
+        auto maybeSSType = p->config.tryGet("info.subsystem");
+        if (maybeSSType)
+        {
+            if (maybeSSType == "console")
+            {
+                p->subsystemType = SubsystemType::Console;
+            }
+            else if (maybeSSType == "windows")
+            {
+                p->subsystemType = SubsystemType::Windows;
+            }
+            else
+            {
+                return error(env.cmdLine, stringFormat("Unknown subsystem type: `{0}`", *maybeSSType));
+            }
+        }
+        else
+        {
+            p->subsystemType = SubsystemType::Console;
+        }
+    }
 
     ws.projects.push_back(move(p));
     return true;

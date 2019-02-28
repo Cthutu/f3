@@ -16,9 +16,10 @@ public:
     VStudioBackend();
 
     func available() const -> bool override;
-    func generateWorkspace(const WorkspaceRef& workspace) -> bool override;
-    func launchIde(const WorkspaceRef& workspace) -> void override;
-    func build(const WorkspaceRef& workspace)->BuildState override;
+    func generateWorkspace(const WorkspaceRef workspace) -> bool override;
+    func launchIde(const WorkspaceRef workspace) -> void override;
+    func build(const WorkspaceRef workspace) -> BuildState override;
+    func buildProject(const ProjectRef project) -> BuildState override;
 
 private:
     std::filesystem::path m_compiler;

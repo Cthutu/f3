@@ -6,6 +6,7 @@
 
 #include <data/config.h>
 #include <data/env.h>
+#include <data/geninfo.h>
 #include <filesystem>
 
 //----------------------------------------------------------------------------------------------------------------------
@@ -43,6 +44,8 @@ struct Project
     Config                      config;         // Project's forge.ini file.
     std::vector<Project*>       deps;           // Project indices for all the dependencies.
     std::string                 guid;
+    AppType                     appType;
+    SubsystemType               subsystemType;
 
     Project(const Env& env, std::filesystem::path&& path)
         : env(env, std::filesystem::path(path))

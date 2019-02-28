@@ -314,7 +314,7 @@ func generatePrj(const ProjectRef proj) -> bool
                     .text("AdditionalOptions", {}, "/std:c++17 %(AdditionalOptions)")
                 .end()
                 .tag("Link", {})
-                    .text("Subsystem", {}, env.exeType == ExeType::Console ? "Console" : "Windows")
+                    .text("Subsystem", {}, proj->subsystemType == SubsystemType::Console ? "Console" : "Windows")
                     .text("GenerateDebugInformation", {}, "true")
                     .text("TreatLinkerWarningAsErrors", {}, "true")
                     .text("AdditionalOptions", {}, "/DEBUG:FULL %(AdditionalOptions)")
@@ -336,7 +336,7 @@ func generatePrj(const ProjectRef proj) -> bool
                     .text("AdditionalOptions", {}, "/std:c++17 %(AdditionalOptions)")
                 .end()
                 .tag("Link", {})
-                    .text("Subsystem", {}, env.exeType == ExeType::Console ? "Console" : "Windows")
+                    .text("Subsystem", {}, proj->subsystemType == SubsystemType::Console ? "Console" : "Windows")
                     .text("EnableCOMDATFolding", {}, "true")
                     .text("OptimizeReferences", {}, "true")
                     .text("GenerateDebugInformation", {}, "true")
@@ -357,36 +357,36 @@ func generatePrj(const ProjectRef proj) -> bool
             .end()
         .end();
 
-    function<void (const Node*)> genLinks = [includeGroup, compileGroup, &projPath, &genLinks](const Node* node) {
-        switch (node->type())
-        {
-        case Node::Type::Cpp:
-            {
-                fs::path srcPath = fs::relative(node->path(), projPath);
-                compileGroup->tag("ClCompile", {{"Include", srcPath.string()}}).end();
-            }
-            break;
-
-        case Node::Type::Header:
-            {
-                fs::path srcPath = fs::relative(node->path(), projPath);
-                if (srcPath.extension() == ".h" || srcPath.extension() == ".hpp")
-                includeGroup->tag("ClInclude", {{"Include", srcPath.string()}}).end();
-            }
-            break;
-
-        case Node::Type::Folder:
-            [[fallthrough]];
-
-        case Node::Type::Root:
-            for (const auto& subNodes : *node)
-            {
-                genLinks(subNodes.get());
-            }
-            break;
-        }
-    };
-    genLinks(proj->env.rootNode.get());
+//     function<void (const Node*)> genLinks = [includeGroup, compileGroup, &projPath, &genLinks](const Node* node) {
+//         switch (node->type())
+//         {
+//         case Node::Type::Cpp:
+//             {
+//                 fs::path srcPath = fs::relative(node->path(), projPath);
+//                 compileGroup->tag("ClCompile", {{"Include", srcPath.string()}}).end();
+//             }
+//             break;
+// 
+//         case Node::Type::Header:
+//             {
+//                 fs::path srcPath = fs::relative(node->path(), projPath);
+//                 if (srcPath.extension() == ".h" || srcPath.extension() == ".hpp")
+//                 includeGroup->tag("ClInclude", {{"Include", srcPath.string()}}).end();
+//             }
+//             break;
+// 
+//         case Node::Type::Folder:
+//             [[fallthrough]];
+// 
+//         case Node::Type::Root:
+//             for (const auto& subNodes : *node)
+//             {
+//                 genLinks(subNodes.get());
+//             }
+//             break;
+//         }
+//     };
+//     genLinks(proj->env.rootNode.get());
 
     fs::path prjPath = projPath / (proj->name + ".vcxproj");
     msg(env.cmdLine, "Generating", stringFormat("Building project: `{0}`.", prjPath.string()));
@@ -412,7 +412,7 @@ func generatePrj(const ProjectRef proj) -> bool
 
 func generateFilters(const ProjectRef& proj) -> bool
 {
-    EnvRef& env = proj->env;
+    Env& env = proj->env;
 
     XmlNode rootNode;
     XmlNode* foldersNode = nullptr;
@@ -433,52 +433,52 @@ func generateFilters(const ProjectRef& proj) -> bool
     // Process the folders, headers and source files
     //
 
-    auto projPath = env->rootPath / "_make";
+    auto projPath = env.rootPath / "_make";
 
-    function<void(const unique_ptr<Node>&)> genFolders = [includesNode, compilesNode, foldersNode, &proj, &env, &projPath, &genFolders]
-    (const unique_ptr<Node>& node) 
-    {
-        switch (node->type())
-        {
-        case Node::Type::Cpp:
-            {
-                auto path = fs::relative(node->path(), projPath);
-                compilesNode->tag("ClCompile", { {"Include", path.string()} })
-                    .text("Filter", {}, fs::relative(node->path().parent_path(), env->rootPath).string())
-                    .end();
-            }
-            break;
-
-        case Node::Type::Header:
-            {
-                auto path = fs::relative(node->path(), projPath);
-                includesNode->tag("ClInclude", { {"Include", path.string()} })
-                    .text("Filter", {}, fs::relative(node->path().parent_path(), env->rootPath).string())
-                    .end();
-            }
-            break;
-
-        case Node::Type::Folder:
-            {
-                fs::path folderPath = fs::relative(node->path(), env->rootPath);
-                foldersNode->tag("Filter", { {"Include", string(folderPath.string())} })
-                    .text("UniqueIdentifier", {}, generateGuid())
-                    .end();
-            }
-            [[fallthrough]];
-
-        case Node::Type::Root:
-            for (const auto& subNodes : *node)
-            {
-                genFolders(subNodes);
-            }
-            break;
-        }
-    };
-    genFolders(env->rootNode);
+//     function<void(const unique_ptr<Node>&)> genFolders = [includesNode, compilesNode, foldersNode, &proj, &env, &projPath, &genFolders]
+//     (const unique_ptr<Node>& node) 
+//     {
+//         switch (node->type())
+//         {
+//         case Node::Type::Cpp:
+//             {
+//                 auto path = fs::relative(node->path(), projPath);
+//                 compilesNode->tag("ClCompile", { {"Include", path.string()} })
+//                     .text("Filter", {}, fs::relative(node->path().parent_path(), env->rootPath).string())
+//                     .end();
+//             }
+//             break;
+// 
+//         case Node::Type::Header:
+//             {
+//                 auto path = fs::relative(node->path(), projPath);
+//                 includesNode->tag("ClInclude", { {"Include", path.string()} })
+//                     .text("Filter", {}, fs::relative(node->path().parent_path(), env->rootPath).string())
+//                     .end();
+//             }
+//             break;
+// 
+//         case Node::Type::Folder:
+//             {
+//                 fs::path folderPath = fs::relative(node->path(), env->rootPath);
+//                 foldersNode->tag("Filter", { {"Include", string(folderPath.string())} })
+//                     .text("UniqueIdentifier", {}, generateGuid())
+//                     .end();
+//             }
+//             [[fallthrough]];
+// 
+//         case Node::Type::Root:
+//             for (const auto& subNodes : *node)
+//             {
+//                 genFolders(subNodes);
+//             }
+//             break;
+//         }
+//     };
+//     genFolders(env->rootNode);
 
     fs::path filtersPath = projPath / (proj->name + ".vcxproj.filters");
-    msg(env->cmdLine, "Generating", stringFormat("Building filters: `{0}`.", filtersPath.string()));
+    msg(env.cmdLine, "Generating", stringFormat("Building filters: `{0}`.", filtersPath.string()));
 
     ofstream f;
     f.open(filtersPath, ios::trunc);
@@ -489,7 +489,7 @@ func generateFilters(const ProjectRef& proj) -> bool
     }
     else
     {
-        error(env->cmdLine, stringFormat("Unable to create file `{0}`.", filtersPath.string()));
+        error(env.cmdLine, stringFormat("Unable to create file `{0}`.", filtersPath.string()));
         return false;
     }
                 
@@ -534,39 +534,41 @@ func VStudioBackend::available() const -> bool
 //----------------------------------------------------------------------------------------------------------------------
 // generateWorkspace
 
-func VStudioBackend::generateWorkspace(const WorkspaceRef& workspace) -> bool
+func VStudioBackend::generateWorkspace(const WorkspaceRef workspace) -> bool
 {
     if (!generateSln(workspace)) return false;
-    if (!generatePrj(workspace->mainProject)) return false;
-    if (!generateFilters(workspace->mainProject)) return false;
+    if (!generatePrj(workspace->projects[0])) return false;
+    if (!generateFilters(workspace->projects[0])) return false;
     return true;
 }
 
 //----------------------------------------------------------------------------------------------------------------------
 // launchIde
 
-func VStudioBackend::launchIde(const WorkspaceRef& workspace) -> void
+func VStudioBackend::launchIde(const WorkspaceRef workspace) -> void
 {
+    ProjectRef mainProject = workspace->projects[0];
+
     auto vs = getVsInfo();
     if (vs)
     {
-        auto projPath = workspace->mainProject->path / "_make";
+        auto projPath = workspace->rootPath / "_make";
         Process ide((vs->installPath / "Common7" / "IDE" / "devenv.exe").string(),
             {
-                (projPath / (workspace->name + ".sln")).string()
+                (projPath / (mainProject->name + ".sln")).string()
             });
     }
 }
 
 //----------------------------------------------------------------------------------------------------------------------
 
-func VStudioBackend::build(const WorkspaceRef& ws) -> BuildState
+func VStudioBackend::build(const WorkspaceRef ws) -> BuildState
 {
-    ProjectRef& proj = ws->mainProject;
-    EnvRef& env = proj->env;
-    if (ws->mainProject->appType == AppType::DynamicLibrary)
+    ProjectRef proj = ws->projects[0];
+    Env& env = proj->env;
+    if (proj->appType == AppType::DynamicLibrary)
     {
-        error(env->cmdLine, "DLL support is unimplemented.");
+        error(env.cmdLine, "DLL support is unimplemented.");
         return BuildState::Failed;
     }
 
@@ -575,127 +577,127 @@ func VStudioBackend::build(const WorkspaceRef& ws) -> BuildState
     //
 
     vector<string> objs;
-    fs::path buildTypeFolder = (ws->mainProject->env->buildType == BuildType::Release) ? "release" : "debug";
+    fs::path buildTypeFolder = (proj->env.buildType == BuildType::Release) ? "release" : "debug";
     int numCompiledFiles = 0;
 
     // Recurse all through the nodes, applying the lambda for each one.
     // #todo: move this to a recursive function that goes through all dependencies
-    if (!env->rootNode->build([
-        this,
-        &env,
-        &proj,
-        &objs,
-        &buildTypeFolder,
-        &numCompiledFiles]
-        (Node* node) -> bool
-    {
-        // Builder
-        fs::path srcPath = node->path();
-        fs::path objPath = env->rootPath / "_obj" / buildTypeFolder / fs::relative(node->path(), env->rootPath);
-        objPath.replace_extension(".obj");
-        objs.push_back(objPath.string());
-
-        bool build = false;
-        if (!fs::exists(objPath)) build = true;
-        else
-        {
-            auto ts = fs::last_write_time(srcPath);
-            auto to = fs::last_write_time(objPath);
-
-            if (ts > to) build = true;
-            else
-            {
-                // Check dependencies
-                if (node->type() == Node::Type::Cpp)
-                {
-                    CppNode* cppNode = (CppNode *)node;
-                    for (const auto& dep : *cppNode)
-                    {
-                        auto ts = fs::last_write_time(dep);
-                        if (ts > to)
-                        {
-                            build = true;
-                            break;
-                        }
-                    }
-                }
-            }
-        }
-
-        if (build)
-        {
-            if (!ensurePath(env->cmdLine, objPath.parent_path()))
-            {
-                error(env->cmdLine, stringFormat("Unable to create folder `{0}`.", objPath.parent_path().string()));
-                return false;
-            }
-
-            string cmd = m_compiler.string();
-            Lines errorLines;
-
-            // #todo: Add multiple include paths for dependencies.
-            vector<string> args = {
-                "/nologo",
-                "/EHsc",
-                "/c",
-                "/Zi",
-                "/W3",
-                "/WX",
-                env->buildType == BuildType::Release ? "/MT" : "/MTd",
-                "/std:c++17",
-                "/Fd\"" + (env->rootPath / "_obj" / buildTypeFolder / "vc141.pdb").string() + "\"",
-                "/Fo\"" + objPath.string() + "\"",
-                "\"" + srcPath.string() + "\"",
-                "/I\"" + (env->rootPath / "src").string() + "\""
-            };
-
-            // DLLs and Libs have a "inc" folder for their public APIs.  Add this to the include paths
-            if (proj->appType != AppType::Exe)
-            {
-                args.emplace_back(string("/I\"") + (env->rootPath / "inc").string() + "\"");
-            }
-
-            // Add the compiler's standard include paths.
-            for (const auto& path : m_includePaths)
-            {
-                args.emplace_back(string("/I\"") + path.string() + "\"");
-            }
-
-            if (env->cmdLine.flag("v") || env->cmdLine.flag("verbose"))
-            {
-                string line = cmd;
-                for (const auto& arg : args)
-                {
-                    line += " " + arg;
-                }
-                msg(env->cmdLine, "Running", line);
-            }
-
-            msg(env->cmdLine, "Compiling", srcPath.string());
-            Process p(move(cmd), move(args), fs::current_path(),
-                [&errorLines](const char* buffer, size_t len) { errorLines.feed(buffer, len); },
-                [&errorLines](const char* buffer, size_t len) { errorLines.feed(buffer, len); });
-
-            if (p.get())
-            {
-                // Non-zero result means a failed compilation.
-                error(env->cmdLine, stringFormat("Compilation of `{0}` failed.", srcPath.string()));
-                errorLines.generate();
-                for (const auto& line : errorLines)
-                {
-                    cout << line << endl;
-                }
-                return false;
-            }
-
-            ++numCompiledFiles;
-        }
-
-        return true;
-    }))
-    {
-        return BuildState::Failed;
-    }
+//     if (!env->rootNode->build([
+//         this,
+//         &env,
+//         &proj,
+//         &objs,
+//         &buildTypeFolder,
+//         &numCompiledFiles]
+//         (Node* node) -> bool
+//     {
+//         // Builder
+//         fs::path srcPath = node->path();
+//         fs::path objPath = env->rootPath / "_obj" / buildTypeFolder / fs::relative(node->path(), env->rootPath);
+//         objPath.replace_extension(".obj");
+//         objs.push_back(objPath.string());
+// 
+//         bool build = false;
+//         if (!fs::exists(objPath)) build = true;
+//         else
+//         {
+//             auto ts = fs::last_write_time(srcPath);
+//             auto to = fs::last_write_time(objPath);
+// 
+//             if (ts > to) build = true;
+//             else
+//             {
+//                 // Check dependencies
+//                 if (node->type() == Node::Type::Cpp)
+//                 {
+//                     CppNode* cppNode = (CppNode *)node;
+//                     for (const auto& dep : *cppNode)
+//                     {
+//                         auto ts = fs::last_write_time(dep);
+//                         if (ts > to)
+//                         {
+//                             build = true;
+//                             break;
+//                         }
+//                     }
+//                 }
+//             }
+//         }
+// 
+//         if (build)
+//         {
+//             if (!ensurePath(env->cmdLine, objPath.parent_path()))
+//             {
+//                 error(env->cmdLine, stringFormat("Unable to create folder `{0}`.", objPath.parent_path().string()));
+//                 return false;
+//             }
+// 
+//             string cmd = m_compiler.string();
+//             Lines errorLines;
+// 
+//             // #todo: Add multiple include paths for dependencies.
+//             vector<string> args = {
+//                 "/nologo",
+//                 "/EHsc",
+//                 "/c",
+//                 "/Zi",
+//                 "/W3",
+//                 "/WX",
+//                 env->buildType == BuildType::Release ? "/MT" : "/MTd",
+//                 "/std:c++17",
+//                 "/Fd\"" + (env->rootPath / "_obj" / buildTypeFolder / "vc141.pdb").string() + "\"",
+//                 "/Fo\"" + objPath.string() + "\"",
+//                 "\"" + srcPath.string() + "\"",
+//                 "/I\"" + (env->rootPath / "src").string() + "\""
+//             };
+// 
+//             // DLLs and Libs have a "inc" folder for their public APIs.  Add this to the include paths
+//             if (proj->appType != AppType::Exe)
+//             {
+//                 args.emplace_back(string("/I\"") + (env->rootPath / "inc").string() + "\"");
+//             }
+// 
+//             // Add the compiler's standard include paths.
+//             for (const auto& path : m_includePaths)
+//             {
+//                 args.emplace_back(string("/I\"") + path.string() + "\"");
+//             }
+// 
+//             if (env->cmdLine.flag("v") || env->cmdLine.flag("verbose"))
+//             {
+//                 string line = cmd;
+//                 for (const auto& arg : args)
+//                 {
+//                     line += " " + arg;
+//                 }
+//                 msg(env->cmdLine, "Running", line);
+//             }
+// 
+//             msg(env->cmdLine, "Compiling", srcPath.string());
+//             Process p(move(cmd), move(args), fs::current_path(),
+//                 [&errorLines](const char* buffer, size_t len) { errorLines.feed(buffer, len); },
+//                 [&errorLines](const char* buffer, size_t len) { errorLines.feed(buffer, len); });
+// 
+//             if (p.get())
+//             {
+//                 // Non-zero result means a failed compilation.
+//                 error(env->cmdLine, stringFormat("Compilation of `{0}` failed.", srcPath.string()));
+//                 errorLines.generate();
+//                 for (const auto& line : errorLines)
+//                 {
+//                     cout << line << endl;
+//                 }
+//                 return false;
+//             }
+// 
+//             ++numCompiledFiles;
+//         }
+// 
+//         return true;
+//     }))
+//     {
+//         return BuildState::Failed;
+//     }
 
     //
     // Linking or library production
