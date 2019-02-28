@@ -5,10 +5,14 @@
 #include <core.h>
 
 #include <data/env.h>
+#include <data/workspace.h>
 
 //----------------------------------------------------------------------------------------------------------------------
 
 func cmd_edit(const Env& env) -> int
 {
+    auto ws = buildWorkspace(env);
+    if (!ws) return 1;
+
     return 0;
 }

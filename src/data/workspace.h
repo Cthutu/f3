@@ -42,6 +42,7 @@ struct Project
     std::string                 name;
     Config                      config;         // Project's forge.ini file.
     std::vector<Project*>       deps;           // Project indices for all the dependencies.
+    std::string                 guid;
 
     Project(const Env& env, std::filesystem::path&& path)
         : env(env, std::filesystem::path(path))
@@ -50,6 +51,8 @@ struct Project
 
     }
 };
+
+using ProjectRef = std::unique_ptr<Project>&;
 
 //----------------------------------------------------------------------------------------------------------------------
 // Workspace
@@ -62,7 +65,10 @@ struct Workspace
 {
     std::filesystem::path                   rootPath;       // Root path of initial project
     std::vector<std::unique_ptr<Project>>   projects;
+    std::string                             guid;
 };
+
+using WorkspaceRef = std::unique_ptr<Workspace>&;
 
 //----------------------------------------------------------------------------------------------------------------------
 // Workspace APIs

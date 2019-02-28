@@ -5,6 +5,7 @@
 #include <core.h>
 #include <data/workspace.h>
 #include <utils/msg.h>
+#include <utils/utils.h>
 
 using namespace std;
 namespace fs = std::filesystem;
@@ -14,8 +15,11 @@ namespace fs = std::filesystem;
 
 func buildProject(Workspace& ws, const Env& env) -> bool
 {
+    assert(checkProject(env));
+
     auto p = make_unique<Project>(env, fs::path(env.rootPath));
-    p->config.readIni(env.cmdLine, env.rootPath);
+    p->rootPath = env.rootPath;
+    p->config.readIni(env.cmdLine, env.rootPath / "forge.ini");
 
     auto maybeName = p->config.tryGet("info.name");
     if (maybeName)
@@ -27,6 +31,8 @@ func buildProject(Workspace& ws, const Env& env) -> bool
         error(env.cmdLine, stringFormat("Project at `{0}` doesn't have a name (add info.name entry to forge.ini).", env.rootPath));
         return false;
     }
+
+    p->guid = generateGuid();
 
     ws.projects.push_back(move(p));
     return true;
@@ -45,6 +51,7 @@ func buildWorkspace(const Env& env) -> unique_ptr<Workspace>
 
     auto ws = make_unique<Workspace>();
     ws->rootPath = env.rootPath;
+    ws->guid = generateGuid();
 
     if (!buildProject(*ws, env))
     {
