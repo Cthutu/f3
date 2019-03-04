@@ -19,6 +19,7 @@ struct Node
 {
     enum class Type
     {
+        Root,
         SourceFile,
         HeaderFile,
         SourceFolder,
@@ -26,8 +27,14 @@ struct Node
         ApiFolder,
     };
 
-    Type                        type;           // Node type
-    std::filesystem::path       fullPath;       // Full path of source file/folder
+    Type                                type;           // Node type
+    std::filesystem::path               fullPath;       // Full path of source file/folder
+    std::vector<std::unique_ptr<Node>>  nodes;          // Child nodes
+
+    Node(Type type, std::filesystem::path&& fullPath)
+        : type(type)
+        , fullPath(move(fullPath))
+    {}
 };
 
 //----------------------------------------------------------------------------------------------------------------------
@@ -44,8 +51,9 @@ struct Project
     Config                      config;         // Project's forge.ini file.
     std::vector<Project*>       deps;           // Project indices for all the dependencies.
     std::string                 guid;
+    std::unique_ptr<Node>       rootNode;
     AppType                     appType;
-    SubsystemType               subsystemType;
+    SubsystemType               ssType;
 
     Project(const Env& env, std::filesystem::path&& path)
         : env(env, std::filesystem::path(path))

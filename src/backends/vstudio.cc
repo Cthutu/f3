@@ -314,7 +314,7 @@ func generatePrj(const ProjectRef proj) -> bool
                     .text("AdditionalOptions", {}, "/std:c++17 %(AdditionalOptions)")
                 .end()
                 .tag("Link", {})
-                    .text("Subsystem", {}, proj->subsystemType == SubsystemType::Console ? "Console" : "Windows")
+                    .text("Subsystem", {}, proj->ssType == SubsystemType::Console ? "Console" : "Windows")
                     .text("GenerateDebugInformation", {}, "true")
                     .text("TreatLinkerWarningAsErrors", {}, "true")
                     .text("AdditionalOptions", {}, "/DEBUG:FULL %(AdditionalOptions)")
@@ -336,7 +336,7 @@ func generatePrj(const ProjectRef proj) -> bool
                     .text("AdditionalOptions", {}, "/std:c++17 %(AdditionalOptions)")
                 .end()
                 .tag("Link", {})
-                    .text("Subsystem", {}, proj->subsystemType == SubsystemType::Console ? "Console" : "Windows")
+                    .text("Subsystem", {}, proj->ssType == SubsystemType::Console ? "Console" : "Windows")
                     .text("EnableCOMDATFolding", {}, "true")
                     .text("OptimizeReferences", {}, "true")
                     .text("GenerateDebugInformation", {}, "true")
@@ -444,7 +444,7 @@ func generateFilters(const ProjectRef& proj) -> bool
 //             {
 //                 auto path = fs::relative(node->path(), projPath);
 //                 compilesNode->tag("ClCompile", { {"Include", path.string()} })
-//                     .text("Filter", {}, fs::relative(node->path().parent_path(), env->rootPath).string())
+//                     .text("Filter", {}, fs::relative(node->path().parent_path(), env.rootPath).string())
 //                     .end();
 //             }
 //             break;
@@ -453,14 +453,14 @@ func generateFilters(const ProjectRef& proj) -> bool
 //             {
 //                 auto path = fs::relative(node->path(), projPath);
 //                 includesNode->tag("ClInclude", { {"Include", path.string()} })
-//                     .text("Filter", {}, fs::relative(node->path().parent_path(), env->rootPath).string())
+//                     .text("Filter", {}, fs::relative(node->path().parent_path(), env.rootPath).string())
 //                     .end();
 //             }
 //             break;
 // 
 //         case Node::Type::Folder:
 //             {
-//                 fs::path folderPath = fs::relative(node->path(), env->rootPath);
+//                 fs::path folderPath = fs::relative(node->path(), env.rootPath);
 //                 foldersNode->tag("Filter", { {"Include", string(folderPath.string())} })
 //                     .text("UniqueIdentifier", {}, generateGuid())
 //                     .end();
@@ -475,7 +475,7 @@ func generateFilters(const ProjectRef& proj) -> bool
 //             break;
 //         }
 //     };
-//     genFolders(env->rootNode);
+//     genFolders(env.rootNode);
 
     fs::path filtersPath = projPath / (proj->name + ".vcxproj.filters");
     msg(env.cmdLine, "Generating", stringFormat("Building filters: `{0}`.", filtersPath.string()));
@@ -582,7 +582,7 @@ func VStudioBackend::build(const WorkspaceRef ws) -> BuildState
 
     // Recurse all through the nodes, applying the lambda for each one.
     // #todo: move this to a recursive function that goes through all dependencies
-//     if (!env->rootNode->build([
+//     if (!env.rootNode->build([
 //         this,
 //         &env,
 //         &proj,
@@ -593,7 +593,7 @@ func VStudioBackend::build(const WorkspaceRef ws) -> BuildState
 //     {
 //         // Builder
 //         fs::path srcPath = node->path();
-//         fs::path objPath = env->rootPath / "_obj" / buildTypeFolder / fs::relative(node->path(), env->rootPath);
+//         fs::path objPath = env.rootPath / "_obj" / buildTypeFolder / fs::relative(node->path(), env.rootPath);
 //         objPath.replace_extension(".obj");
 //         objs.push_back(objPath.string());
 // 
@@ -626,9 +626,9 @@ func VStudioBackend::build(const WorkspaceRef ws) -> BuildState
 // 
 //         if (build)
 //         {
-//             if (!ensurePath(env->cmdLine, objPath.parent_path()))
+//             if (!ensurePath(env.cmdLine, objPath.parent_path()))
 //             {
-//                 error(env->cmdLine, stringFormat("Unable to create folder `{0}`.", objPath.parent_path().string()));
+//                 error(env.cmdLine, stringFormat("Unable to create folder `{0}`.", objPath.parent_path().string()));
 //                 return false;
 //             }
 // 
@@ -643,18 +643,18 @@ func VStudioBackend::build(const WorkspaceRef ws) -> BuildState
 //                 "/Zi",
 //                 "/W3",
 //                 "/WX",
-//                 env->buildType == BuildType::Release ? "/MT" : "/MTd",
+//                 env.buildType == BuildType::Release ? "/MT" : "/MTd",
 //                 "/std:c++17",
-//                 "/Fd\"" + (env->rootPath / "_obj" / buildTypeFolder / "vc141.pdb").string() + "\"",
+//                 "/Fd\"" + (env.rootPath / "_obj" / buildTypeFolder / "vc141.pdb").string() + "\"",
 //                 "/Fo\"" + objPath.string() + "\"",
 //                 "\"" + srcPath.string() + "\"",
-//                 "/I\"" + (env->rootPath / "src").string() + "\""
+//                 "/I\"" + (env.rootPath / "src").string() + "\""
 //             };
 // 
 //             // DLLs and Libs have a "inc" folder for their public APIs.  Add this to the include paths
 //             if (proj->appType != AppType::Exe)
 //             {
-//                 args.emplace_back(string("/I\"") + (env->rootPath / "inc").string() + "\"");
+//                 args.emplace_back(string("/I\"") + (env.rootPath / "inc").string() + "\"");
 //             }
 // 
 //             // Add the compiler's standard include paths.
@@ -663,17 +663,17 @@ func VStudioBackend::build(const WorkspaceRef ws) -> BuildState
 //                 args.emplace_back(string("/I\"") + path.string() + "\"");
 //             }
 // 
-//             if (env->cmdLine.flag("v") || env->cmdLine.flag("verbose"))
+//             if (env.cmdLine.flag("v") || env.cmdLine.flag("verbose"))
 //             {
 //                 string line = cmd;
 //                 for (const auto& arg : args)
 //                 {
 //                     line += " " + arg;
 //                 }
-//                 msg(env->cmdLine, "Running", line);
+//                 msg(env.cmdLine, "Running", line);
 //             }
 // 
-//             msg(env->cmdLine, "Compiling", srcPath.string());
+//             msg(env.cmdLine, "Compiling", srcPath.string());
 //             Process p(move(cmd), move(args), fs::current_path(),
 //                 [&errorLines](const char* buffer, size_t len) { errorLines.feed(buffer, len); },
 //                 [&errorLines](const char* buffer, size_t len) { errorLines.feed(buffer, len); });
@@ -681,7 +681,7 @@ func VStudioBackend::build(const WorkspaceRef ws) -> BuildState
 //             if (p.get())
 //             {
 //                 // Non-zero result means a failed compilation.
-//                 error(env->cmdLine, stringFormat("Compilation of `{0}` failed.", srcPath.string()));
+//                 error(env.cmdLine, stringFormat("Compilation of `{0}` failed.", srcPath.string()));
 //                 errorLines.generate();
 //                 for (const auto& line : errorLines)
 //                 {
@@ -704,7 +704,7 @@ func VStudioBackend::build(const WorkspaceRef ws) -> BuildState
     // #todo: Support DLLs
     //
     Lines errorLines;
-    fs::path binPath = env->rootPath / "_bin" / buildTypeFolder;
+    fs::path binPath = env.rootPath / "_bin" / buildTypeFolder;
     string ext;
 
     switch (proj->appType)
@@ -720,12 +720,12 @@ func VStudioBackend::build(const WorkspaceRef ws) -> BuildState
 
     if (!fs::exists(outPath) || (numCompiledFiles > 0))
     {
-        if (!ensurePath(env->cmdLine, outPath.parent_path()))
+        if (!ensurePath(env.cmdLine, outPath.parent_path()))
         {
-            error(env->cmdLine, stringFormat("Unable to create folder `{0}`.", outPath.string()));
+            error(env.cmdLine, stringFormat("Unable to create folder `{0}`.", outPath.string()));
             return BuildState::Failed;
         }
-        bool release = (env->buildType == BuildType::Release);
+        bool release = (env.buildType == BuildType::Release);
 
         if (proj->appType == AppType::Exe ||
             proj->appType == AppType::DynamicLibrary)
@@ -739,7 +739,7 @@ func VStudioBackend::build(const WorkspaceRef ws) -> BuildState
                 "/WX",
                 release ? "/DEBUG:NONE" : "/DEBUG:FULL",
                 string("/PDB:\"") + pdbPath.string() + "\"",
-                env->exeType == ExeType::Console ? "/SUBSYSTEM:CONSOLE" : "/SUBSYSTEM:WINDOWS",
+                proj->ssType == SubsystemType::Console ? "/SUBSYSTEM:CONSOLE" : "/SUBSYSTEM:WINDOWS",
                 release ? "/OPT:REF" : "",
                 release ? "/OPT:ICF" : "",
                 "/MACHINE:X64"
@@ -759,31 +759,31 @@ func VStudioBackend::build(const WorkspaceRef ws) -> BuildState
             }
 
             // Add libraries mentioned in forge.ini
-            string libs = env->cfg.get("build.libs");
+            string libs = proj->config.get("build.libs");
             vector<string> libsVector = split(libs, ";");
             for (const auto& lib : libsVector)
             {
                 args.emplace_back(lib + ".lib");
             }
 
-            if (env->cmdLine.flag("v") || env->cmdLine.flag("verbose"))
+            if (env.cmdLine.flag("v") || env.cmdLine.flag("verbose"))
             {
                 string line = cmd;
                 for (const auto& arg : args)
                 {
                     line += " " + arg;
                 }
-                msg(env->cmdLine, "Running", line);
+                msg(env.cmdLine, "Running", line);
             }
 
-            msg(env->cmdLine, "Linking", outPath.string());
+            msg(env.cmdLine, "Linking", outPath.string());
             Process p(move(cmd), move(args), fs::current_path(),
                 [&errorLines](const char* buffer, size_t len) { errorLines.feed(buffer, len); },
                 [&errorLines](const char* buffer, size_t len) { errorLines.feed(buffer, len); });
 
             if (p.get())
             {
-                error(env->cmdLine, stringFormat("Linking of `{0}` failed.", outPath.string()));
+                error(env.cmdLine, stringFormat("Linking of `{0}` failed.", outPath.string()));
                 errorLines.generate();
                 for (const auto& line : errorLines)
                 {
@@ -809,24 +809,24 @@ func VStudioBackend::build(const WorkspaceRef ws) -> BuildState
                 args.emplace_back(obj);
             }
 
-            if (env->cmdLine.flag("v") || env->cmdLine.flag("verbose"))
+            if (env.cmdLine.flag("v") || env.cmdLine.flag("verbose"))
             {
                 string line = cmd;
                 for (const auto& arg : args)
                 {
                     line += " " + arg;
                 }
-                msg(env->cmdLine, "Running", line);
+                msg(env.cmdLine, "Running", line);
             }
 
-            msg(env->cmdLine, "Archiving", outPath.string());
+            msg(env.cmdLine, "Archiving", outPath.string());
             Process p(move(cmd), move(args), fs::current_path(),
                 [&errorLines](const char* buffer, size_t len) { errorLines.feed(buffer, len); },
                 [&errorLines](const char* buffer, size_t len) { errorLines.feed(buffer, len); });
 
             if (p.get())
             {
-                error(env->cmdLine, stringFormat("Creation of `{0}` failed.", outPath.string()));
+                error(env.cmdLine, stringFormat("Creation of `{0}` failed.", outPath.string()));
                 errorLines.generate();
                 for (const auto& line : errorLines)
                 {

@@ -11,6 +11,45 @@ using namespace std;
 namespace fs = std::filesystem;
 
 //----------------------------------------------------------------------------------------------------------------------
+// scanSrc
+
+func scanSrc(unique_ptr<Node>& root, const fs::path& path, Node::Type folderType) -> void
+{
+    if (fs::exists(path) && fs::is_directory(path))
+    {
+        auto fnode = make_unique<Node>(folderType, fs::path(path));
+        root->nodes.push_back(move(fnode));
+
+        for (const auto& entry : fs::directory_iterator(fnode->fullPath))
+        {
+            const fs::path& path = entry.path();
+            if (fs::is_directory(path))
+            {
+                scanSrc(fnode, path, folderType);
+            }
+            else
+            {
+                string ext = path.extension().string();
+                if (ext == ".cc" || ext == ".cpp")
+                {
+                    auto ccnode = make_unique<Node>(Node::Type::SourceFile, fs::path(path));
+                    fnode->nodes.push_back(move(ccnode));
+                }
+                else if (ext == ".h" || ext == ".hpp")
+                {
+                    auto hnode = make_unique<Node>(Node::Type::HeaderFile, fs::path(path));
+                    fnode->nodes.push_back(move(hnode));
+                }
+                else
+                {
+                    // Ignore all other file types.
+                }
+            }
+        }
+    }
+}
+
+//----------------------------------------------------------------------------------------------------------------------
 // buildProjects
 
 func buildProject(Workspace& ws, const Env& env) -> bool
@@ -49,30 +88,47 @@ func buildProject(Workspace& ws, const Env& env) -> bool
         else return error(env.cmdLine, stringFormat("Unknown application type.  Please check info.type entry in forge.ini for project `{0}`.", p->name));
     }
 
-    // Figure out subsystem type
-    p->subsystemType = SubsystemType::NotRequired;
-    if (p->appType == AppType::Exe)
+    p->guid = generateGuid();
+    p->rootNode = make_unique<Node>(Node::Type::Root, fs::path(p->rootPath));
+
+    string appTypeStr = p->config.get("info.type");
+    if (appTypeStr == "lib")
     {
-        auto maybeSSType = p->config.tryGet("info.subsystem");
-        if (maybeSSType)
+        p->appType = AppType::Library;
+        p->ssType = SubsystemType::NotRequired;
+    }
+    else if (appTypeStr == "dll")
+    {
+        p->appType = AppType::DynamicLibrary;
+        p->ssType = SubsystemType::NotRequired;
+    }
+    else if (appTypeStr == "exe")
+    {
+        p->appType = AppType::Exe;
+        string ssTypeStr = p->config.get("subsystem");
+        if (ssTypeStr == "windows")
         {
-            if (maybeSSType == "console")
-            {
-                p->subsystemType = SubsystemType::Console;
-            }
-            else if (maybeSSType == "windows")
-            {
-                p->subsystemType = SubsystemType::Windows;
-            }
-            else
-            {
-                return error(env.cmdLine, stringFormat("Unknown subsystem type: `{0}`", *maybeSSType));
-            }
+            p->ssType = SubsystemType::Windows;
+        }
+        else if (ssTypeStr == "console" || ssTypeStr.empty())
+        {
+            p->ssType = SubsystemType::Console;
         }
         else
         {
-            p->subsystemType = SubsystemType::Console;
+            return error(env.cmdLine, "Invalid subsystem type (info.subsystem).");
         }
+    }
+    else
+    {
+        return error(env.cmdLine, "Invalid application type (info.type).");
+    }
+
+    scanSrc(p->rootNode, p->rootPath / "src", Node::Type::SourceFolder);
+    if (p->appType == AppType::Library || p->appType == AppType::DynamicLibrary)
+    {
+        scanSrc(p->rootNode, p->rootPath / "inc", Node::Type::ApiFolder);
+        scanSrc(p->rootNode, p->rootPath / "test", Node::Type::TestFolder);
     }
 
     ws.projects.push_back(move(p));
