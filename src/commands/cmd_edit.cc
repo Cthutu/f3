@@ -23,5 +23,10 @@ func cmd_edit(const Env& env) -> int
         return 1;
     }
 
+    if (!env.cmdLine.flag("gen"))
+    {
+        backend->launchIde(ws);
+    }
+
     return 0;
 }

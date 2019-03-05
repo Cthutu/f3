@@ -3,6 +3,8 @@
 //----------------------------------------------------------------------------------------------------------------------
 
 #include <core.h>
+
+#include <backends/backends.h>
 #include <data/workspace.h>
 #include <utils/msg.h>
 #include <utils/utils.h>
