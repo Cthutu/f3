@@ -18,8 +18,6 @@ func scanSrc(unique_ptr<Node>& root, const fs::path& path, Node::Type folderType
     if (fs::exists(path) && fs::is_directory(path))
     {
         auto fnode = make_unique<Node>(folderType, fs::path(path));
-        root->nodes.push_back(move(fnode));
-
         for (const auto& entry : fs::directory_iterator(fnode->fullPath))
         {
             const fs::path& path = entry.path();
@@ -46,6 +44,8 @@ func scanSrc(unique_ptr<Node>& root, const fs::path& path, Node::Type folderType
                 }
             }
         }
+
+        root->nodes.push_back(move(fnode));
     }
 }
 
