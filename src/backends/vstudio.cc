@@ -357,36 +357,42 @@ func generatePrj(const ProjectRef proj) -> bool
             .end()
         .end();
 
-//     function<void (const Node*)> genLinks = [includeGroup, compileGroup, &projPath, &genLinks](const Node* node) {
-//         switch (node->type())
-//         {
-//         case Node::Type::Cpp:
-//             {
-//                 fs::path srcPath = fs::relative(node->path(), projPath);
-//                 compileGroup->tag("ClCompile", {{"Include", srcPath.string()}}).end();
-//             }
-//             break;
-// 
-//         case Node::Type::Header:
-//             {
-//                 fs::path srcPath = fs::relative(node->path(), projPath);
-//                 if (srcPath.extension() == ".h" || srcPath.extension() == ".hpp")
-//                 includeGroup->tag("ClInclude", {{"Include", srcPath.string()}}).end();
-//             }
-//             break;
-// 
-//         case Node::Type::Folder:
-//             [[fallthrough]];
-// 
-//         case Node::Type::Root:
-//             for (const auto& subNodes : *node)
-//             {
-//                 genLinks(subNodes.get());
-//             }
-//             break;
-//         }
-//     };
-//     genLinks(proj->env.rootNode.get());
+    bool includeTestFolder = false;
+    bool includeApiFolder = (proj->appType == AppType::Library || proj->appType == AppType::DynamicLibrary);
+
+    function<void (const NodeRef)> genLinks = [includeGroup, compileGroup, &projPath, &genLinks,
+        includeTestFolder, includeApiFolder](const NodeRef node) {
+        switch (node->type)
+        {
+        case Node::Type::SourceFile:
+            {
+                fs::path srcPath = fs::relative(node->fullPath, projPath);
+                compileGroup->tag("ClCompile", {{"Include", srcPath.string()}}).end();
+            }
+            break;
+
+        case Node::Type::HeaderFile:
+            {
+                fs::path srcPath = fs::relative(node->fullPath, projPath);
+                if (srcPath.extension() == ".h" || srcPath.extension() == ".hpp")
+                includeGroup->tag("ClInclude", {{"Include", srcPath.string()}}).end();
+            }
+            break;
+
+        case Node::Type::ApiFolder:
+        case Node::Type::TestFolder:
+        case Node::Type::SourceFolder:
+        case Node::Type::Root:
+            if (node->type == Node::Type::ApiFolder && !includeApiFolder) break;
+            if (node->type == Node::Type::TestFolder && !includeTestFolder) break;
+            for (auto& subNode : node->nodes)
+            {
+                genLinks(subNode);
+            }
+            break;
+        }
+    };
+    genLinks(proj->rootNode);
 
     fs::path prjPath = projPath / (proj->name + ".vcxproj");
     msg(env.cmdLine, "Generating", stringFormat("Building project: `{0}`.", prjPath.string()));
@@ -435,47 +441,55 @@ func generateFilters(const ProjectRef& proj) -> bool
 
     auto projPath = env.rootPath / "_make";
 
-//     function<void(const unique_ptr<Node>&)> genFolders = [includesNode, compilesNode, foldersNode, &proj, &env, &projPath, &genFolders]
-//     (const unique_ptr<Node>& node) 
-//     {
-//         switch (node->type())
-//         {
-//         case Node::Type::Cpp:
-//             {
-//                 auto path = fs::relative(node->path(), projPath);
-//                 compilesNode->tag("ClCompile", { {"Include", path.string()} })
-//                     .text("Filter", {}, fs::relative(node->path().parent_path(), env.rootPath).string())
-//                     .end();
-//             }
-//             break;
-// 
-//         case Node::Type::Header:
-//             {
-//                 auto path = fs::relative(node->path(), projPath);
-//                 includesNode->tag("ClInclude", { {"Include", path.string()} })
-//                     .text("Filter", {}, fs::relative(node->path().parent_path(), env.rootPath).string())
-//                     .end();
-//             }
-//             break;
-// 
-//         case Node::Type::Folder:
-//             {
-//                 fs::path folderPath = fs::relative(node->path(), env.rootPath);
-//                 foldersNode->tag("Filter", { {"Include", string(folderPath.string())} })
-//                     .text("UniqueIdentifier", {}, generateGuid())
-//                     .end();
-//             }
-//             [[fallthrough]];
-// 
-//         case Node::Type::Root:
-//             for (const auto& subNodes : *node)
-//             {
-//                 genFolders(subNodes);
-//             }
-//             break;
-//         }
-//     };
-//     genFolders(env.rootNode);
+    bool includeTestFolder = false;
+    bool includeApiFolder = (proj->appType == AppType::Library || proj->appType == AppType::DynamicLibrary);
+
+    function<void(const NodeRef)> genFolders = 
+        [includesNode, compilesNode, foldersNode, &proj, &env, &projPath, &genFolders, includeTestFolder, includeApiFolder]
+    (const NodeRef node) 
+    {
+        switch (node->type)
+        {
+        case Node::Type::SourceFile:
+            {
+                auto path = fs::relative(node->fullPath, projPath);
+                compilesNode->tag("ClCompile", { {"Include", path.string()} })
+                    .text("Filter", {}, fs::relative(node->fullPath.parent_path(), env.rootPath).string())
+                    .end();
+            }
+            break;
+
+        case Node::Type::HeaderFile:
+            {
+                auto path = fs::relative(node->fullPath, projPath);
+                includesNode->tag("ClInclude", { {"Include", path.string()} })
+                    .text("Filter", {}, fs::relative(node->fullPath.parent_path(), env.rootPath).string())
+                    .end();
+            }
+            break;
+
+        case Node::Type::ApiFolder:
+        case Node::Type::TestFolder:
+        case Node::Type::SourceFolder:
+            if (node->type == Node::Type::ApiFolder && !includeApiFolder) break;
+            if (node->type == Node::Type::TestFolder && !includeTestFolder) break;
+            {
+                fs::path folderPath = fs::relative(node->fullPath, env.rootPath);
+                foldersNode->tag("Filter", { {"Include", string(folderPath.string())} })
+                    .text("UniqueIdentifier", {}, generateGuid())
+                    .end();
+            }
+            [[fallthrough]];
+
+        case Node::Type::Root:
+            for (auto& subNode : node->nodes)
+            {
+                genFolders(subNode);
+            }
+            break;
+        }
+    };
+    genFolders(proj->rootNode);
 
     fs::path filtersPath = projPath / (proj->name + ".vcxproj.filters");
     msg(env.cmdLine, "Generating", stringFormat("Building filters: `{0}`.", filtersPath.string()));
