@@ -30,6 +30,7 @@ struct Node
     Type                                type;           // Node type
     std::filesystem::path               fullPath;       // Full path of source file/folder
     std::vector<std::unique_ptr<Node>>  nodes;          // Child nodes
+    std::vector<std::filesystem::path>  deps;           // Dependencies
 
     Node(Type type, std::filesystem::path&& fullPath)
         : type(type)

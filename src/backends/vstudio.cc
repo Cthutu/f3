@@ -137,7 +137,7 @@ func getVsInfo() -> optional<VSInfo>
 
 //----------------------------------------------------------------------------------------------------------------------
 //
-func generateSln(const WorkspaceRef& ws) -> bool
+func VStudioBackend::generateSln(const WorkspaceRef ws) -> bool
 {
     ProjectRef mainProject = ws->projects[0];
 
@@ -216,7 +216,7 @@ func generateSln(const WorkspaceRef& ws) -> bool
 //----------------------------------------------------------------------------------------------------------------------
 // generatePrj
 
-func generatePrj(const ProjectRef proj) -> bool
+func VStudioBackend::generatePrj(const ProjectRef proj) -> bool
 {
     Env& env = proj->env;
 
@@ -357,8 +357,7 @@ func generatePrj(const ProjectRef proj) -> bool
             .end()
         .end();
 
-    bool includeTestFolder = false;
-    bool includeApiFolder = (proj->appType == AppType::Library || proj->appType == AppType::DynamicLibrary);
+    auto [includeApiFolder, includeTestFolder] = whichFolders(proj);
 
     function<void (const NodeRef)> genLinks = [includeGroup, compileGroup, &projPath, &genLinks,
         includeTestFolder, includeApiFolder](const NodeRef node) {
@@ -416,7 +415,7 @@ func generatePrj(const ProjectRef proj) -> bool
 //----------------------------------------------------------------------------------------------------------------------
 // generateFilters
 
-func generateFilters(const ProjectRef& proj) -> bool
+func VStudioBackend::generateFilters(const ProjectRef& proj) -> bool
 {
     Env& env = proj->env;
 
@@ -441,8 +440,7 @@ func generateFilters(const ProjectRef& proj) -> bool
 
     auto projPath = env.rootPath / "_make";
 
-    bool includeTestFolder = false;
-    bool includeApiFolder = (proj->appType == AppType::Library || proj->appType == AppType::DynamicLibrary);
+    auto[includeApiFolder, includeTestFolder] = whichFolders(proj);
 
     function<void(const NodeRef)> genFolders = 
         [includesNode, compilesNode, foldersNode, &proj, &env, &projPath, &genFolders, includeTestFolder, includeApiFolder]
@@ -535,6 +533,16 @@ VStudioBackend::VStudioBackend()
     }
 }
 
+//----------------------------------------------------------------------------------------------------------------------
+// whichFolders
+
+func VStudioBackend::whichFolders(const ProjectRef proj) -> tuple<bool, bool>
+{
+    return {
+        (proj->appType == AppType::Library || proj->appType == AppType::DynamicLibrary),
+        false
+    };
+}
 
 //----------------------------------------------------------------------------------------------------------------------
 // available
@@ -596,122 +604,144 @@ func VStudioBackend::build(const WorkspaceRef ws) -> BuildState
 
     // Recurse all through the nodes, applying the lambda for each one.
     // #todo: move this to a recursive function that goes through all dependencies
-//     if (!env.rootNode->build([
-//         this,
-//         &env,
-//         &proj,
-//         &objs,
-//         &buildTypeFolder,
-//         &numCompiledFiles]
-//         (Node* node) -> bool
-//     {
-//         // Builder
-//         fs::path srcPath = node->path();
-//         fs::path objPath = env.rootPath / "_obj" / buildTypeFolder / fs::relative(node->path(), env.rootPath);
-//         objPath.replace_extension(".obj");
-//         objs.push_back(objPath.string());
-// 
-//         bool build = false;
-//         if (!fs::exists(objPath)) build = true;
-//         else
-//         {
-//             auto ts = fs::last_write_time(srcPath);
-//             auto to = fs::last_write_time(objPath);
-// 
-//             if (ts > to) build = true;
-//             else
-//             {
-//                 // Check dependencies
-//                 if (node->type() == Node::Type::Cpp)
-//                 {
-//                     CppNode* cppNode = (CppNode *)node;
-//                     for (const auto& dep : *cppNode)
-//                     {
-//                         auto ts = fs::last_write_time(dep);
-//                         if (ts > to)
-//                         {
-//                             build = true;
-//                             break;
-//                         }
-//                     }
-//                 }
-//             }
-//         }
-// 
-//         if (build)
-//         {
-//             if (!ensurePath(env.cmdLine, objPath.parent_path()))
-//             {
-//                 error(env.cmdLine, stringFormat("Unable to create folder `{0}`.", objPath.parent_path().string()));
-//                 return false;
-//             }
-// 
-//             string cmd = m_compiler.string();
-//             Lines errorLines;
-// 
-//             // #todo: Add multiple include paths for dependencies.
-//             vector<string> args = {
-//                 "/nologo",
-//                 "/EHsc",
-//                 "/c",
-//                 "/Zi",
-//                 "/W3",
-//                 "/WX",
-//                 env.buildType == BuildType::Release ? "/MT" : "/MTd",
-//                 "/std:c++17",
-//                 "/Fd\"" + (env.rootPath / "_obj" / buildTypeFolder / "vc141.pdb").string() + "\"",
-//                 "/Fo\"" + objPath.string() + "\"",
-//                 "\"" + srcPath.string() + "\"",
-//                 "/I\"" + (env.rootPath / "src").string() + "\""
-//             };
-// 
-//             // DLLs and Libs have a "inc" folder for their public APIs.  Add this to the include paths
-//             if (proj->appType != AppType::Exe)
-//             {
-//                 args.emplace_back(string("/I\"") + (env.rootPath / "inc").string() + "\"");
-//             }
-// 
-//             // Add the compiler's standard include paths.
-//             for (const auto& path : m_includePaths)
-//             {
-//                 args.emplace_back(string("/I\"") + path.string() + "\"");
-//             }
-// 
-//             if (env.cmdLine.flag("v") || env.cmdLine.flag("verbose"))
-//             {
-//                 string line = cmd;
-//                 for (const auto& arg : args)
-//                 {
-//                     line += " " + arg;
-//                 }
-//                 msg(env.cmdLine, "Running", line);
-//             }
-// 
-//             msg(env.cmdLine, "Compiling", srcPath.string());
-//             Process p(move(cmd), move(args), fs::current_path(),
-//                 [&errorLines](const char* buffer, size_t len) { errorLines.feed(buffer, len); },
-//                 [&errorLines](const char* buffer, size_t len) { errorLines.feed(buffer, len); });
-// 
-//             if (p.get())
-//             {
-//                 // Non-zero result means a failed compilation.
-//                 error(env.cmdLine, stringFormat("Compilation of `{0}` failed.", srcPath.string()));
-//                 errorLines.generate();
-//                 for (const auto& line : errorLines)
-//                 {
-//                     cout << line << endl;
-//                 }
-//                 return false;
-//             }
-// 
-//             ++numCompiledFiles;
-//         }
-// 
-//         return true;
-//     }))
-//     {
-//         return BuildState::Failed;
-//     }
+    auto[includeApiFolder, includeTestFolder] = whichFolders(proj);
+
+    function<bool(const NodeRef)> buildNodes =
+        [this, &buildNodes, &numCompiledFiles, &objs, &proj, &buildTypeFolder, includeApiFolder, includeTestFolder, &env]
+    (const NodeRef node) -> bool
+    {
+        switch (node->type)
+        {
+        case Node::Type::ApiFolder:
+        case Node::Type::TestFolder:
+        case Node::Type::SourceFolder:
+        case Node::Type::Root:
+            if (node->type == Node::Type::ApiFolder && !includeApiFolder) return true;
+            if (node->type == Node::Type::TestFolder && !includeTestFolder) return true;
+
+            for (auto& subnode : node->nodes)
+            {
+                if (!buildNodes(subnode)) return false;
+            }
+            break;
+
+        case Node::Type::HeaderFile:
+            break;
+
+        case Node::Type::SourceFile:
+            {
+                fs::path srcPath = node->fullPath;
+                fs::path objPath = env.rootPath / "_obj" / buildTypeFolder / fs::relative(node->fullPath, env.rootPath);
+                objPath.replace_extension(".obj");
+                objs.push_back(objPath.string());
+
+                bool build = false;
+                if (!fs::exists(objPath)) build = true;
+                else
+                {
+                    auto ts = fs::last_write_time(srcPath);
+                    auto to = fs::last_write_time(objPath);
+
+                    if (ts > to) build = true;
+                    else
+                    {
+                        // Check dependencies
+                        for (auto& dep : node->deps)
+                        {
+                            auto ts = fs::last_write_time(dep);
+                            if (ts > to)
+                            {
+                                build = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                if (build)
+                {
+                    if (!ensurePath(env.cmdLine, objPath.parent_path()))
+                    {
+                        error(env.cmdLine, stringFormat("Unable to create folder `{0}`.", objPath.parent_path().string()));
+                        return false;
+                    }
+
+                    string cmd = m_compiler.string();
+                    Lines errorLines;
+
+                    // #todo: Add multiple include paths for dependencies.
+                    vector<string> args = {
+                        "/nologo",
+                        "/EHsc",
+                        "/c",
+                        "/Zi",
+                        "/W3",
+                        "/WX",
+                        env.buildType == BuildType::Release ? "/MT" : "/MTd",
+                        "/std:c++17",
+                        "/Fd\"" + (env.rootPath / "_obj" / buildTypeFolder / "vc141.pdb").string() + "\"",
+                        "/Fo\"" + objPath.string() + "\"",
+                        "\"" + srcPath.string() + "\"",
+                        "/I\"" + (env.rootPath / "src").string() + "\""
+                    };
+
+                    // DLLs and Libs have a "inc" folder for their public APIs.  Add this to the include paths
+                    if (proj->appType != AppType::Exe)
+                    {
+                        args.emplace_back(string("/I\"") + (env.rootPath / "inc").string() + "\"");
+                    }
+
+                    // Add the compiler's standard include paths.
+                    for (const auto& path : m_includePaths)
+                    {
+                        args.emplace_back(string("/I\"") + path.string() + "\"");
+                    }
+
+                    if (env.cmdLine.flag("v") || env.cmdLine.flag("verbose"))
+                    {
+                        string line = cmd;
+                        for (const auto& arg : args)
+                        {
+                            line += " " + arg;
+                        }
+                        msg(env.cmdLine, "Running", line);
+                    }
+
+                    msg(env.cmdLine, "Compiling", srcPath.string());
+                    Process p(move(cmd), move(args), fs::current_path(),
+                        [&errorLines](const char* buffer, size_t len) { errorLines.feed(buffer, len); },
+                        [&errorLines](const char* buffer, size_t len) { errorLines.feed(buffer, len); });
+
+                    if (p.get())
+                    {
+                        // Non-zero result means a failed compilation.
+                        error(env.cmdLine, stringFormat("Compilation of `{0}` failed.", srcPath.string()));
+                        errorLines.generate();
+                        for (const auto& line : errorLines)
+                        {
+                            cout << line << endl;
+                        }
+                        return false;
+                    }
+
+                    ++numCompiledFiles;
+                }
+            }
+            break;
+
+        }
+
+        return true;
+    };
+    if (!buildNodes(proj->rootNode))
+    {
+        return BuildState::Success;
+    }
+
+    if (numCompiledFiles == 0)
+    {
+        return BuildState::NoWork;
+    }
 
     //
     // Linking or library production

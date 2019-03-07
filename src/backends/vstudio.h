@@ -22,6 +22,14 @@ public:
     func buildProject(const ProjectRef project) -> BuildState override;
 
 private:
+    // Returns <includeApiFolder?, includeTestFolder?>
+    func whichFolders(const ProjectRef proj) -> std::tuple<bool, bool>;
+
+    func generateSln(const WorkspaceRef ws) -> bool;
+    func generatePrj(const ProjectRef proj) -> bool;
+    func generateFilters(const ProjectRef proj) -> bool;
+
+private:
     std::filesystem::path m_compiler;
     std::filesystem::path m_linker;
     std::filesystem::path m_lib;
