@@ -1,4 +1,4 @@
 @echo off
 forge build --release
-copy _bin\release\f.exe .
-copy _bin\release\f.exe %install_path%
+copy _bin\release\forge.exe .
+copy _bin\release\forge.exe %install_path%
