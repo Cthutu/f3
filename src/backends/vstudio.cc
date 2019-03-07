@@ -646,6 +646,7 @@ func VStudioBackend::build(const WorkspaceRef ws) -> BuildState
                     else
                     {
                         // Check dependencies
+                        scanDependencies(proj, node);
                         for (auto& dep : node->deps)
                         {
                             auto ts = fs::last_write_time(dep);

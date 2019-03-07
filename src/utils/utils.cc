@@ -95,12 +95,11 @@ func trim(string &s) -> void
 func extractSubStr(const string& str, char startDelim, char endDelim) -> string
 {
     size_t start = str.find(startDelim);
-    size_t end = str.rfind(endDelim);
+    if (start == string::npos) return {};
 
-    if (start == string::npos || end == string::npos)
-    {
-        return {};
-    }
+    size_t end = find(str.begin() + start, str.end(), endDelim) - str.begin();
+
+    if (end == str.size()) return {};
 
     return str.substr(start + 1, end - start - 1);
 }
