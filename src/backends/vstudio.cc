@@ -605,9 +605,12 @@ func VStudioBackend::build(const WorkspaceRef ws) -> BuildState
     // Recurse all through the nodes, applying the lambda for each one.
     // #todo: move this to a recursive function that goes through all dependencies
     auto[includeApiFolder, includeTestFolder] = whichFolders(proj);
+    bool usePch = false;
+    optional<string> pchFile;
 
     function<bool(const NodeRef)> buildNodes =
-        [this, &buildNodes, &numCompiledFiles, &objs, &proj, &buildTypeFolder, includeApiFolder, includeTestFolder, &env]
+        [this, &buildNodes, &numCompiledFiles, &objs, &proj, &buildTypeFolder, includeApiFolder, includeTestFolder, &env, 
+        &usePch, &pchFile]
     (const NodeRef node) -> bool
     {
         switch (node->type)
@@ -629,6 +632,7 @@ func VStudioBackend::build(const WorkspaceRef ws) -> BuildState
             break;
 
         case Node::Type::SourceFile:
+        case Node::Type::PchFile:
             {
                 fs::path srcPath = node->fullPath;
                 fs::path objPath = env.rootPath / "_obj" / buildTypeFolder / fs::relative(node->fullPath, env.rootPath);
@@ -686,6 +690,15 @@ func VStudioBackend::build(const WorkspaceRef ws) -> BuildState
                         "/I\"" + (env.rootPath / "src").string() + "\""
                     };
 
+                    // Check for pre-compiled header.
+                    if (usePch)
+                    {
+                        string flag = node->type == Node::Type::PchFile ? "/Yc" : "/Yu";
+                        args.emplace_back(flag + *pchFile);
+                        auto pchPath = env.rootPath / "_obj" / (proj->name + ".pch");
+                        args.emplace_back(string("/Fp") + pchPath.string());
+                    }
+
                     // DLLs and Libs have a "inc" folder for their public APIs.  Add this to the include paths
                     if (proj->appType != AppType::Exe)
                     {
@@ -734,9 +747,35 @@ func VStudioBackend::build(const WorkspaceRef ws) -> BuildState
 
         return true;
     };
+
+    //
+    // Pre-compiled header
+    //
+
+    pchFile = proj->config.tryGet("build.pch");
+    if (pchFile)
+    {
+        usePch = true;
+        fs::path pchPath = env.rootPath / "_obj" / "pch.cc";
+        if (!ensurePath(env.cmdLine, env.rootPath / "_obj")) return BuildState::Failed;
+        TextFile pchTextFile{ fs::path(pchPath) };
+        pchTextFile << (string("#include <") + *pchFile + ">\n");
+        pchTextFile.write();
+
+        auto node = make_unique<Node>(Node::Type::PchFile, move(pchPath));
+        if (!buildNodes(node))
+        {
+            return BuildState::Failed;
+        }
+    }
+
+    //
+    // Build all nodes
+    //
+
     if (!buildNodes(proj->rootNode))
     {
-        return BuildState::Success;
+        return BuildState::Failed;
     }
 
     if (numCompiledFiles == 0)
