@@ -107,7 +107,7 @@ func buildProject(Workspace& ws, const Env& env) -> bool
     else if (appTypeStr == "exe")
     {
         p->appType = AppType::Exe;
-        string ssTypeStr = p->config.get("subsystem");
+        string ssTypeStr = p->config.get("info.subsystem");
         if (ssTypeStr == "windows")
         {
             p->ssType = SubsystemType::Windows;

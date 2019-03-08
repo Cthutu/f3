@@ -111,8 +111,11 @@ GenInfo::GenInfo(const CmdLine& cmdLine)
     textFiles.back() << "[build]";
     textFiles.back() << "# Uncomment this to add libraries to link with.";
     textFiles.back() << "# libs = ";
+    textFiles.back() << "# Uncomment this to add pre-compiled header support.";
+    textFiles.back() << "# pch = ";
     textFiles.back() << "";
     textFiles.back() << "[dependencies]";
+    textFiles.back() << "";
 
     // SRC folder
     if (appType == AppType::Exe)
