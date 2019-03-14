@@ -54,11 +54,18 @@ struct Project
     std::filesystem::path       rootPath;       // Path of project (intended or actual)
     std::string                 name;
     Config                      config;         // Project's forge.ini file.
-    std::vector<Project*>       deps;           // Project indices for all the dependencies.
     std::string                 guid;
     std::unique_ptr<Node>       rootNode;
     AppType                     appType;
     SubsystemType               ssType;
+
+    struct Dep
+    {
+        string name;
+        string version;
+        Project* proj;
+    };
+    std::vector<Dep>            deps;           // Project indices for all the dependencies.
 
     Project(const Env& env, std::filesystem::path&& path)
         : env(env, std::filesystem::path(path))

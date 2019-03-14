@@ -52,11 +52,49 @@ func scanSrc(unique_ptr<Node>& root, const fs::path& path, Node::Type folderType
 }
 
 //----------------------------------------------------------------------------------------------------------------------
+// processDeps
+
+func buildProject(Workspace& ws, const Env& env) -> bool;
+
+func processDeps(Workspace& ws, const Env& env, ProjectRef& proj) -> bool
+{
+    auto kvs = proj->config.fetchSection("dependencies");
+    for (const auto&[key, value] : kvs)
+    {
+        Project::Dep d;
+        auto elems = split(key, ":");
+        if (elems.size() != 2)
+        {
+            return error(env.cmdLine, stringFormat("Invalid dependency declaration: `{0}`.", key));
+        }
+
+        if (elems[0] == "local")
+        {
+            // Local library
+            d.name = elems[1];
+            fs::path projPath = fs::canonical(proj->rootPath / value);
+            Env newEnv(env, move(projPath));
+            if (!buildProject(ws, newEnv)) return false;
+            d.proj = ws.projects.back().get();
+        }
+        else
+        {
+            return error(env.cmdLine, stringFormat("Invalid dependency type: `{0}`.", elems[0]));
+        }
+    }
+
+    return true;
+}
+
+//----------------------------------------------------------------------------------------------------------------------
 // buildProjects
 
 func buildProject(Workspace& ws, const Env& env) -> bool
 {
-    assert(checkProject(env));
+    if (!checkProject(env))
+    {
+        return error(env.cmdLine, stringFormat("Invalid project path at `{0}`.", env.rootPath));
+    }
 
     auto p = make_unique<Project>(env, fs::path(env.rootPath));
     p->rootPath = env.rootPath;
@@ -90,7 +128,6 @@ func buildProject(Workspace& ws, const Env& env) -> bool
         else return error(env.cmdLine, stringFormat("Unknown application type.  Please check info.type entry in forge.ini for project `{0}`.", p->name));
     }
 
-    p->guid = generateGuid();
     p->rootNode = make_unique<Node>(Node::Type::Root, fs::path(p->rootPath));
 
     string appTypeStr = p->config.get("info.type");
@@ -132,6 +169,8 @@ func buildProject(Workspace& ws, const Env& env) -> bool
         scanSrc(p->rootNode, p->rootPath / "inc", Node::Type::ApiFolder);
         scanSrc(p->rootNode, p->rootPath / "test", Node::Type::TestFolder);
     }
+
+    if (!processDeps(ws, env, p)) return false;
 
     ws.projects.push_back(move(p));
     return true;

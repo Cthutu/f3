@@ -32,6 +32,8 @@ public:
     func writeIni(const CmdLine& cmdLine, const std::filesystem::path& path) const -> bool;
     func readIni(const CmdLine& cmdLine, const std::filesystem::path& path) -> bool;
 
+    func fetchSection(const std::string& name) -> std::vector<std::pair<std::string, std::string>>;
+
 private:
     struct Section
     {

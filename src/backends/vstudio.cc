@@ -559,8 +559,8 @@ func VStudioBackend::available() const -> bool
 func VStudioBackend::generateWorkspace(const WorkspaceRef workspace) -> bool
 {
     if (!generateSln(workspace)) return false;
-    if (!generatePrj(workspace->projects[0])) return false;
-    if (!generateFilters(workspace->projects[0])) return false;
+    if (!generatePrj(workspace->projects.back())) return false;
+    if (!generateFilters(workspace->projects.back())) return false;
     return true;
 }
 
@@ -569,7 +569,7 @@ func VStudioBackend::generateWorkspace(const WorkspaceRef workspace) -> bool
 
 func VStudioBackend::launchIde(const WorkspaceRef workspace) -> void
 {
-    ProjectRef mainProject = workspace->projects[0];
+    ProjectRef mainProject = workspace->projects.back();
 
     auto vs = getVsInfo();
     if (vs)
@@ -586,7 +586,7 @@ func VStudioBackend::launchIde(const WorkspaceRef workspace) -> void
 
 func VStudioBackend::build(const WorkspaceRef ws) -> BuildState
 {
-    ProjectRef proj = ws->projects[0];
+    ProjectRef proj = ws->projects.back();
     Env& env = proj->env;
     if (proj->appType == AppType::DynamicLibrary)
     {
