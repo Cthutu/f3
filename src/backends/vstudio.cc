@@ -139,24 +139,20 @@ func getVsInfo() -> optional<VSInfo>
 //
 func VStudioBackend::generateSln(const WorkspaceRef ws) -> bool
 {
-    ProjectRef mainProject = ws->projects[0];
-
-    Env& env = mainProject->env;
-
     auto projPath = ws->rootPath/ "_make";
-    if (!ensurePath(env.cmdLine, fs::path(projPath)))
+    if (!ensurePath(ws->projects.back()->env.cmdLine, fs::path(projPath)))
     {
-        error(env.cmdLine, stringFormat("Unable to create folder `{0}`.", projPath));
+        error(ws->projects.back()->env.cmdLine, stringFormat("Unable to create folder `{0}`.", projPath));
         return false;
     }
 
-    fs::path slnPath = projPath / (mainProject->name + ".sln");
-    msg(env.cmdLine, "Generating", stringFormat("Building solution: `{0}`.", slnPath.string()));
+    fs::path slnPath = projPath / (ws->projects.back()->name + ".sln");
+    msg(ws->projects.back()->env.cmdLine, "Generating", stringFormat("Building solution: `{0}`.", slnPath.string()));
 
     optional<VSInfo> vi = getVsInfo();
     if (!vi)
     {
-        error(env.cmdLine, "Unable to locate compiler.");
+        error(ws->projects.back()->env.cmdLine, "Unable to locate compiler.");
         return false;
     }
 
@@ -165,11 +161,19 @@ func VStudioBackend::generateSln(const WorkspaceRef ws) -> bool
         << "Microsoft Visual Studio Solution File, Format Version 12.00"
         << "# Visual Studio 15"
         << stringFormat("VisualStudioVersion = {0}", vi->vsVersion)
-        << "MinimumVisualStudioVersion = 10.0.40219.1"
-        << stringFormat("Project(\"{{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}}\") = \"{0}\", \"{0}.vcxproj\", \"{1}\"",
-            mainProject->name, mainProject->guid)
-        << "EndProject"
+        << "MinimumVisualStudioVersion = 10.0.40219.1";
 
+    for (auto& proj : ws->projects)
+    {
+        fs::path relativePath = fs::relative(proj->rootPath / "_make", ws->rootPath / "_make") / stringFormat("{0}.vcxproj", proj->name);
+
+        f
+            << stringFormat("Project(\"{{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}}\") = \"{0}\", \"{0}\", \"{1}\"",
+                relativePath, proj->guid)
+            << "EndProject";
+    }
+
+    f
         << "Global"
 
         << "\tGlobalSection(SolutionConfigurationPlatforms) = preSolution"
@@ -177,11 +181,18 @@ func VStudioBackend::generateSln(const WorkspaceRef ws) -> bool
         << "\t\tRelease|x64 = Release|x64"
         << "\tEndGlobalSection"
 
-        << "\tGlobalSection(ProjectConfigurationPlatforms) = postSolution"
-        << stringFormat("\t\t{0}.Debug|x64.ActiveCfg = Debug|x64", mainProject->guid)
-        << stringFormat("\t\t{0}.Debug|x64.Build.0 = Debug|x64", mainProject->guid)
-        << stringFormat("\t\t{0}.Release|x64.ActiveCfg = Release|x64", mainProject->guid)
-        << stringFormat("\t\t{0}.Release|x64.Build.0 = Release|x64", mainProject->guid)
+        << "\tGlobalSection(ProjectConfigurationPlatforms) = postSolution";
+
+    for (auto& proj : ws->projects)
+    {
+        f
+            << stringFormat("\t\t{0}.Debug|x64.ActiveCfg = Debug|x64", proj->guid)
+            << stringFormat("\t\t{0}.Debug|x64.Build.0 = Debug|x64", proj->guid)
+            << stringFormat("\t\t{0}.Release|x64.ActiveCfg = Release|x64", proj->guid)
+            << stringFormat("\t\t{0}.Release|x64.Build.0 = Release|x64", proj->guid);
+    }
+
+    f
         << "\tEndGlobalSection"
 
         << "\tGlobalSection(SolutionProperties) = preSolution"
@@ -200,7 +211,7 @@ func VStudioBackend::generateSln(const WorkspaceRef ws) -> bool
     }
     else
     {
-        error(mainProject->env.cmdLine, stringFormat("Cannot create solution file `{0}`", slnPath));
+        error(ws->projects.back()->env.cmdLine, stringFormat("Cannot create solution file `{0}`", slnPath));
         try
         {
             fs::remove_all(projPath);
@@ -211,6 +222,20 @@ func VStudioBackend::generateSln(const WorkspaceRef ws) -> bool
         }
         return false;
     }
+}
+
+//----------------------------------------------------------------------------------------------------------------------
+// generatePrjs
+
+func VStudioBackend::generatePrjs(const WorkspaceRef ws) -> bool
+{
+    for (auto& proj : ws->projects)
+    {
+        if (!generatePrj(proj)) return false;
+        if (!generateFilters(proj)) return false;
+    }
+
+    return true;
 }
 
 //----------------------------------------------------------------------------------------------------------------------
@@ -225,6 +250,7 @@ func VStudioBackend::generatePrj(const ProjectRef proj) -> bool
     auto vs = *getVsInfo();
     vector<string> versions = split(vs.vsVersion, ".");
     auto projPath = proj->rootPath / "_make";
+    if (!ensurePath(env.cmdLine, fs::path(projPath))) return false;
 
     string includeDirectories = fs::relative(env.rootPath / "src", projPath).string() + ";" + join(vs.includePaths, ";");
     string libDirectories = join(vs.libPaths, ";");
@@ -559,8 +585,7 @@ func VStudioBackend::available() const -> bool
 func VStudioBackend::generateWorkspace(const WorkspaceRef workspace) -> bool
 {
     if (!generateSln(workspace)) return false;
-    if (!generatePrj(workspace->projects.back())) return false;
-    if (!generateFilters(workspace->projects.back())) return false;
+    if (!generatePrjs(workspace)) return false;
     return true;
 }
 

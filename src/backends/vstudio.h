@@ -26,6 +26,7 @@ private:
     func whichFolders(const ProjectRef proj) -> std::tuple<bool, bool>;
 
     func generateSln(const WorkspaceRef ws) -> bool;
+    func generatePrjs(const WorkspaceRef ws) -> bool;
     func generatePrj(const ProjectRef proj) -> bool;
     func generateFilters(const ProjectRef proj) -> bool;
 
