@@ -6,6 +6,7 @@
 
 #include <backends/backends.h>
 #include <data/workspace.h>
+#include <functional>
 #include <utils/msg.h>
 #include <utils/utils.h>
 
@@ -76,6 +77,7 @@ func processDeps(Workspace& ws, const Env& env, ProjectRef& proj) -> bool
             Env newEnv(env, move(projPath));
             if (!buildProject(ws, newEnv)) return false;
             d.proj = ws.projects.back().get();
+            proj->deps.push_back(d);
         }
         else
         {
@@ -108,25 +110,6 @@ func buildProject(Workspace& ws, const Env& env) -> bool
     else return error(env.cmdLine, stringFormat("Project at `{0}` doesn't have a name (add info.name entry to forge.ini).", env.rootPath));
 
     p->guid = generateGuid();
-
-    // Figure out application type
-    auto maybeAppType = p->config.tryGet("info.type");
-    if (maybeAppType)
-    {
-        if (maybeAppType == "lib")
-        {
-            p->appType = AppType::Library;
-        }
-        else if (maybeAppType == "dll")
-        {
-            p->appType = AppType::DynamicLibrary;
-        }
-        else if (maybeAppType == "exe")
-        {
-            p->appType = AppType::Exe;
-        }
-        else return error(env.cmdLine, stringFormat("Unknown application type.  Please check info.type entry in forge.ini for project `{0}`.", p->name));
-    }
 
     p->rootNode = make_unique<Node>(Node::Type::Root, fs::path(p->rootPath));
 
@@ -196,8 +179,81 @@ func buildWorkspace(const Env& env) -> unique_ptr<Workspace>
         return {};
     }
 
+    //ws->includePaths = includePaths(ws, ws->projects.back());
+
     return ws;
 }
+
+//----------------------------------------------------------------------------------------------------------------------
+// generateBuildOrder
+
+// func generateBuildOrder(WorkspaceRef ws) -> void
+// {
+//     vector<const Project*> projs;
+//     function<bool(vector<const Project*>&, const Project*)> getBuildOrder =
+//         [&getBuildOrder](vector<const Project*>& paths, const Project* proj) -> bool
+//     {
+//         for (const auto& dep : proj->deps)
+//         {
+//             if (find(paths.begin(), paths.end(), dep.proj->rootPath) == paths.end())
+//             {
+//                 getBuildOrder(paths, dep.proj);
+//             }
+//         }
+// 
+//         if (find(paths.begin(), paths.end(), proj->rootPath) != paths.end())
+//         {
+//             return error(proj->env.cmdLine, stringFormat("Cyclic dependency on project at `{0}`.", proj->rootPath));
+//         }
+// 
+//         paths.push_back(proj);
+//         return true;
+//     };
+// 
+//     if (!getBuildOrder(projPaths, proj.get())) return {};
+// }
+// 
+// //----------------------------------------------------------------------------------------------------------------------
+// // includePaths
+// 
+// func generatePaths(const WorkspaceRef ws, const ProjectRef proj) -> vector<fs::path>
+// {
+//     // Step 1 - Generate sorted list of project dependencies.  Here we detect cyclic dependencies.
+//     vector<const Project*> projs;
+//     function<bool (vector<const Project*>&, const Project*)> getBuildOrder =
+//         [&getBuildOrder](vector<const Project*>& paths, const Project* proj) -> bool
+//     {
+//         for (const auto& dep : proj->deps)
+//         {
+//             if (find(paths.begin(), paths.end(), dep.proj->rootPath) == paths.end())
+//             {
+//                 getBuildOrder(paths, dep.proj);
+//             }
+//         }
+// 
+//         if (find(paths.begin(), paths.end(), proj->rootPath) != paths.end())
+//         {
+//             return error(proj->env.cmdLine, stringFormat("Cyclic dependency on project at `{0}`.", proj->rootPath));
+//         }
+// 
+//         paths.push_back(proj);
+//         return true;
+//     };
+// 
+//     if (!getBuildOrder(projPaths, proj.get())) return {};
+// 
+//     // Step 2 - Generate the include paths
+//     vector<fs::path> incPaths;
+//     for (const auto& proj : projs)
+//     {
+//         switch (proj->appType)
+//         {
+//         case AppType::Exe:
+//             incPaths.emplace_back(proj->rootPath / "src");
+//         }
+//     }
+//     return projPaths;
+// }
 
 //----------------------------------------------------------------------------------------------------------------------
 //----------------------------------------------------------------------------------------------------------------------

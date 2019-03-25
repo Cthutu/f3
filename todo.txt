@@ -1,0 +1,6 @@
+[ ] - Add include folders for deps
+[ ] - Add libraries to link for deps
+[ ] - Add library search folders for deps
+[ ] - Edit command should generate dep project files locally
+[ ] - Don't unnecessarily recompile pch file
+

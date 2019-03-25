@@ -163,14 +163,20 @@ func VStudioBackend::generateSln(const WorkspaceRef ws) -> bool
         << stringFormat("VisualStudioVersion = {0}", vi->vsVersion)
         << "MinimumVisualStudioVersion = 10.0.40219.1";
 
-    for (auto& proj : ws->projects)
-    {
+    auto writeProj = [&f, &ws](const ProjectRef proj) {
         fs::path relativePath = fs::relative(proj->rootPath / "_make", ws->rootPath / "_make") / stringFormat("{0}.vcxproj", proj->name);
 
         f
             << stringFormat("Project(\"{{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}}\") = \"{0}\", \"{0}\", \"{1}\"",
                 relativePath, proj->guid)
             << "EndProject";
+    };
+
+    writeProj(ws->projects.back());
+    for (auto& proj : ws->projects)
+    {
+        if (proj == ws->projects.back()) continue;
+        writeProj(proj);
     }
 
     f
@@ -239,6 +245,78 @@ func VStudioBackend::generatePrjs(const WorkspaceRef ws) -> bool
 }
 
 //----------------------------------------------------------------------------------------------------------------------
+// getProjectType
+// Returns the string used in a project file for representing the application type.
+
+func VStudioBackend::getProjectType(const ProjectRef proj) -> string
+{
+    switch (proj->appType)
+    {
+    case AppType::Exe:
+        return "Application";
+
+    case AppType::Library:
+        return "StaticLibrary";
+
+    case AppType::DynamicLibrary:
+        return "DynamicLibrary";
+    }
+
+    return {};
+}
+
+//----------------------------------------------------------------------------------------------------------------------
+// getProjectExt
+// Returns the filename extension for the project's binary.
+
+func VStudioBackend::getProjectExt(const ProjectRef proj) -> string
+{
+    switch (proj->appType)
+    {
+    case AppType::Exe:
+        return ".exe";
+
+    case AppType::Library:
+        return ".lib";
+
+    case AppType::DynamicLibrary:
+        return ".dll";
+    }
+
+    return {};
+}
+
+//----------------------------------------------------------------------------------------------------------------------
+// getIncludePaths
+
+func VStudioBackend::getIncludePaths(const ProjectRef proj) -> string
+{
+    auto projPath = proj->rootPath / "_make";
+
+    vector<fs::path> incPaths;
+
+    //
+    // Add paths
+    //
+
+    incPaths.emplace_back(fs::relative(proj->rootPath / "src", projPath));
+
+    if (proj->appType == AppType::Library || proj->appType == AppType::DynamicLibrary)
+    {
+        incPaths.emplace_back(fs::relative(proj->rootPath / "inc", projPath));
+    }
+
+    //
+    // Convert to single semi-colon delimited string
+    //
+
+    vector<string> strings;
+    transform(incPaths.begin(), incPaths.end(), back_inserter(strings), 
+        [](const fs::path& path) -> string { return path.string(); });
+    return join(strings, ";");
+}
+
+//----------------------------------------------------------------------------------------------------------------------
 // generatePrj
 
 func VStudioBackend::generatePrj(const ProjectRef proj) -> bool
@@ -252,7 +330,7 @@ func VStudioBackend::generatePrj(const ProjectRef proj) -> bool
     auto projPath = proj->rootPath / "_make";
     if (!ensurePath(env.cmdLine, fs::path(projPath))) return false;
 
-    string includeDirectories = fs::relative(env.rootPath / "src", projPath).string() + ";" + join(vs.includePaths, ";");
+    string includeDirectories = getIncludePaths(proj) + ";" + join(vs.includePaths, ";");
     string libDirectories = join(vs.libPaths, ";");
 
     XmlNode* includeGroup = nullptr;
@@ -281,13 +359,13 @@ func VStudioBackend::generatePrj(const ProjectRef proj) -> bool
             .tag("Import", {{"Project", "$(VCTargetsPath)\\Microsoft.Cpp.Default.props"}})
             .end()
             .tag("PropertyGroup", {{"Condition", "'$(Configuration)|$(Platform)'=='Debug|x64'"}, {"Label", "Configuration"}})
-                .text("ConfigurationType", {}, "Application")   // #todo: change for libs and dlls
+                .text("ConfigurationType", {}, getProjectType(proj))
                 .text("UseDebugLibraries", {}, "true")
                 .text("PlatformToolset", {}, "v141")
                 .text("CharacterSet", {}, "MultiByte")
             .end()
             .tag("PropertyGroup", {{"Condition", "'$(Configuration)|$(Platform)'=='Release|x64'"}, {"Label", "Configuration"}})
-                .text("ConfigurationType", {}, "Application")   // #todo: change for libs and dlls
+                .text("ConfigurationType", {}, getProjectType(proj))
                 .text("UseDebugLibraries", {}, "false")
                 .text("PlatformToolset", {}, "v141")
                 .text("WholeProgramOptimization", {}, "true")
@@ -318,14 +396,14 @@ func VStudioBackend::generatePrj(const ProjectRef proj) -> bool
                 .text("OutDir", {}, "..\\_bin\\debug\\")
                 .text("IntDir", {}, "..\\_obj\\debug\\")
                 .text("TargetName", {}, string(proj->name))
-                .text("TargetExt", {}, ".exe")      // #todo: Support libs and dlls
+                .text("TargetExt", {}, getProjectExt(proj))
             .end()
             .tag("PropertyGroup", {{"Condition", "'$(Configuration)|$(Platform)'=='Release|x64'"}})
                 .text("LinkIncremental", {}, "false")
                 .text("OutDir", {}, "..\\_bin\\release\\")
                 .text("IntDir", {}, "..\\_obj\\release\\")
                 .text("TargetName", {}, string(proj->name))
-                .text("TargetExt", {}, ".exe")      // #todo: Support libs and dlls
+                .text("TargetExt", {}, getProjectExt(proj))
             .end()
             .tag("ItemDefinitionGroup", { {"Condition", "'$(Configuration)|$(Platform)'=='Debug|x64'"}})
                 .tag("ClCompile", {})

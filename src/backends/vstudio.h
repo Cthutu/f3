@@ -30,6 +30,10 @@ private:
     func generatePrj(const ProjectRef proj) -> bool;
     func generateFilters(const ProjectRef proj) -> bool;
 
+    func getProjectType(const ProjectRef proj) -> std::string;
+    func getProjectExt(const ProjectRef proj) -> std::string;
+    func getIncludePaths(const ProjectRef proj) -> std::string;
+
 private:
     std::filesystem::path m_compiler;
     std::filesystem::path m_linker;

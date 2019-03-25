@@ -34,7 +34,8 @@ func join(const vector<string>& elems, string&& delim) -> string
 {
     if (elems.empty()) return {};
 
-    stringstream ss(elems[0]);
+    stringstream ss;
+    ss << elems[0];
     for (size_t i = 1; i < elems.size(); ++i)
     {
         ss << delim << elems[i];

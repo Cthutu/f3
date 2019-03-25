@@ -48,6 +48,8 @@ using NodeRef = std::unique_ptr<Node>&;
 // Represents a single project
 //----------------------------------------------------------------------------------------------------------------------
 
+using Paths = std::vector<std::filesystem::path>;
+
 struct Project
 {
     Env                         env;
@@ -58,6 +60,8 @@ struct Project
     std::unique_ptr<Node>       rootNode;
     AppType                     appType;
     SubsystemType               ssType;
+    Paths                       includePaths;
+    Paths                       libPaths;
 
     struct Dep
     {
@@ -69,7 +73,6 @@ struct Project
 
     Project(const Env& env, std::filesystem::path&& path)
         : env(env, std::filesystem::path(path))
-
     {
 
     }
@@ -89,6 +92,7 @@ struct Workspace
     std::filesystem::path                   rootPath;       // Root path of initial project
     std::vector<std::unique_ptr<Project>>   projects;
     std::string                             guid;
+    Paths                                   buildOrder;
 };
 
 using WorkspaceRef = std::unique_ptr<Workspace>&;
@@ -98,7 +102,6 @@ using WorkspaceRef = std::unique_ptr<Workspace>&;
 //----------------------------------------------------------------------------------------------------------------------
 
 func buildWorkspace(const Env& env) -> std::unique_ptr<Workspace>;
-func includePaths(const WorkspaceRef ws, const ProjectRef proj) -> std::vector<std::filesystem::path>;
 
 //----------------------------------------------------------------------------------------------------------------------
 //----------------------------------------------------------------------------------------------------------------------
