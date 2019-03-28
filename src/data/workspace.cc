@@ -7,6 +7,7 @@
 #include <backends/backends.h>
 #include <data/workspace.h>
 #include <functional>
+#include <set>
 #include <utils/msg.h>
 #include <utils/utils.h>
 
@@ -182,6 +183,29 @@ func buildWorkspace(const Env& env) -> unique_ptr<Workspace>
     //ws->includePaths = includePaths(ws, ws->projects.back());
 
     return ws;
+}
+
+//----------------------------------------------------------------------------------------------------------------------
+// getProjectCompleteDeps
+// Returns a set of all the dependencies for a particular project (including dependencies of its dependencies).
+
+func getProjectCompleteDeps(const ProjectRef proj) -> set<Project *>
+{
+    set<Project *> projs;
+    function<void(const Project*)> scanProjects = [&projs, &scanProjects](const Project* proj) {
+        for (const auto& dep : proj->deps)
+        {
+            if (projs.find(dep.proj) == projs.end())
+            {
+                // We don't have this dependency
+                projs.insert(dep.proj);
+                scanProjects(dep.proj);
+            }
+        }
+    };
+
+    scanProjects(proj.get());
+    return projs;
 }
 
 //----------------------------------------------------------------------------------------------------------------------

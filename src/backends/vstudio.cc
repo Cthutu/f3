@@ -296,6 +296,16 @@ func VStudioBackend::getIncludePaths(const ProjectRef proj) -> string
     vector<fs::path> incPaths;
 
     //
+    // Add dependency paths
+    //
+
+    set<Project *> deps = getProjectCompleteDeps(proj);
+    for (const Project * proj : deps)
+    {
+        incPaths.emplace_back(fs::relative(proj->rootPath / "inc", projPath));
+    }
+
+    //
     // Add paths
     //
 
