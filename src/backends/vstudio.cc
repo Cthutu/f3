@@ -166,10 +166,20 @@ func VStudioBackend::generateSln(const WorkspaceRef ws) -> bool
     auto writeProj = [&f, &ws](const ProjectRef proj) {
         fs::path relativePath = fs::relative(proj->rootPath / "_make", ws->rootPath / "_make") / stringFormat("{0}.vcxproj", proj->name);
 
-        f
-            << stringFormat("Project(\"{{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}}\") = \"{0}\", \"{0}\", \"{1}\"",
-                relativePath, proj->guid)
-            << "EndProject";
+        f << stringFormat("Project(\"{{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}}\") = \"{0}\", \"{1}\", \"{2}\"",
+            proj->name, relativePath.string(), proj->guid);
+
+        if (!proj->deps.empty())
+        {
+            f << "\tProjectSection(ProjectDependencies) = postProject";
+            for (const auto& dep : proj->deps)
+            {
+                f << stringFormat("\t\t{0} = {0}", dep.proj->guid);
+            }
+            f << "\tEndProjectSection";
+        }
+
+        f << "EndProject";
     };
 
     writeProj(ws->projects.back());
