@@ -300,7 +300,7 @@ func VStudioBackend::getIncludePaths(const ProjectRef proj) -> string
     //
 
     set<Project *> deps = getProjectCompleteDeps(proj);
-    for (const Project * proj : deps)
+    for (const Project* proj : deps)
     {
         incPaths.emplace_back(fs::relative(proj->rootPath / "inc", projPath));
     }
@@ -327,6 +327,47 @@ func VStudioBackend::getIncludePaths(const ProjectRef proj) -> string
 }
 
 //----------------------------------------------------------------------------------------------------------------------
+// getLibraries
+
+func VStudioBackend::getLibraries(const ProjectRef proj) -> string
+{
+    auto projPath = proj->rootPath / "_make";
+
+    vector<string> libs;
+
+    set<Project*> deps = getProjectCompleteDeps(proj);
+    for (const Project* proj : deps)
+    {
+        libs.emplace_back(proj->name + ".lib");
+    }
+
+    return join(libs, ";");
+}
+
+//----------------------------------------------------------------------------------------------------------------------
+// getLibraryPaths
+
+func VStudioBackend::getLibraryPaths(const ProjectRef proj, BuildType buildType) -> string
+{
+    auto projPath = proj->rootPath / "_make";
+    string buildString = buildType == BuildType::Debug ? "debug" : "release";
+    
+    vector<fs::path> libPaths;
+
+    set<Project*> deps = getProjectCompleteDeps(proj);
+    for (const Project* proj : deps)
+    {
+        libPaths.emplace_back(fs::relative(proj->rootPath / "_bin" / buildString, projPath));
+    }
+
+    vector<string> libPathStrings;
+    transform(libPaths.begin(), libPaths.end(), back_inserter(libPathStrings),
+        [](const fs::path& path) -> string { return path.string(); });
+
+    return join(libPathStrings, ";");
+}
+
+//----------------------------------------------------------------------------------------------------------------------
 // generatePrj
 
 func VStudioBackend::generatePrj(const ProjectRef proj) -> bool
@@ -341,7 +382,6 @@ func VStudioBackend::generatePrj(const ProjectRef proj) -> bool
     if (!ensurePath(env.cmdLine, fs::path(projPath))) return false;
 
     string includeDirectories = getIncludePaths(proj) + ";" + join(vs.includePaths, ";");
-    string libDirectories = join(vs.libPaths, ";");
 
     XmlNode* includeGroup = nullptr;
     XmlNode* compileGroup = nullptr;
@@ -432,6 +472,8 @@ func VStudioBackend::generatePrj(const ProjectRef proj) -> bool
                     .text("GenerateDebugInformation", {}, "true")
                     .text("TreatLinkerWarningAsErrors", {}, "true")
                     .text("AdditionalOptions", {}, "/DEBUG:FULL %(AdditionalOptions)")
+                    .text("AdditionalDependencies", {}, getLibraries(proj) + ";%(AdditionalDependencies)")
+                    .text("AdditionalLibraryDirectories", {}, getLibraryPaths(proj, BuildType::Debug) + ";%(AdditionalLibraryDirectories)")
                 .end()
             .end()
             .tag("ItemDefinitionGroup", { {"Condition", "'$(Configuration)|$(Platform)'=='Release|x64'"}})
@@ -455,6 +497,8 @@ func VStudioBackend::generatePrj(const ProjectRef proj) -> bool
                     .text("OptimizeReferences", {}, "true")
                     .text("GenerateDebugInformation", {}, "true")
                     .text("TreatLinkerWarningAsErrors", {}, "true")
+                    .text("AdditionalDependencies", {}, getLibraries(proj) + ";%(AdditionalDependencies)")
+                    .text("AdditionalLibraryDirectories", {}, getLibraryPaths(proj, BuildType::Release) + ";%(AdditionalLibraryDirectories)")
                 .end()
             .end()
             .tag("ItemGroup", {}, &includeGroup)

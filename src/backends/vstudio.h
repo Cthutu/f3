@@ -33,6 +33,8 @@ private:
     func getProjectType(const ProjectRef proj) -> std::string;
     func getProjectExt(const ProjectRef proj) -> std::string;
     func getIncludePaths(const ProjectRef proj) -> std::string;
+    func getLibraries(const ProjectRef proj) -> std::string;
+    func getLibraryPaths(const ProjectRef proj, BuildType buildType) -> std::string;
 
 private:
     std::filesystem::path m_compiler;
