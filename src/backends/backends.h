@@ -28,12 +28,11 @@ public:
     virtual func generateWorkspace(const WorkspaceRef workspace) -> bool = 0;
     virtual func launchIde(const WorkspaceRef workspace) -> void = 0;
     virtual func build(const WorkspaceRef ws) -> BuildState = 0;
-    virtual func buildProject(const ProjectRef p) -> BuildState = 0;
 
 protected:
-    func scanDependencies(const ProjectRef proj, NodeRef node) -> void;
-    func getIncludePaths(const ProjectRef proj, std::vector<std::filesystem::path>& paths) -> void;
-    func getLibPaths(const ProjectRef proj, BuildType buildType, std::vector<std::filesystem::path>& paths) -> void;
+    func scanDependencies(const Project* proj, const std::unique_ptr<Node>& node) -> void;
+    func getIncludePaths(const Project* proj, std::vector<std::filesystem::path>& paths) -> void;
+    func getLibPaths(const Project* proj, BuildType buildType, std::vector<std::filesystem::path>& paths) -> void;
 };
 
 //----------------------------------------------------------------------------------------------------------------------

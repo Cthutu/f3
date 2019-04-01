@@ -189,7 +189,7 @@ func buildWorkspace(const Env& env) -> unique_ptr<Workspace>
 // getProjectCompleteDeps
 // Returns a set of all the dependencies for a particular project (including dependencies of its dependencies).
 
-func getProjectCompleteDeps(const ProjectRef proj) -> set<Project *>
+func getProjectCompleteDeps(const Project* proj) -> set<Project *>
 {
     set<Project *> projs;
     function<void(const Project*)> scanProjects = [&projs, &scanProjects](const Project* proj) {
@@ -204,7 +204,7 @@ func getProjectCompleteDeps(const ProjectRef proj) -> set<Project *>
         }
     };
 
-    scanProjects(proj.get());
+    scanProjects(proj);
     return projs;
 }
 

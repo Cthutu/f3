@@ -299,7 +299,7 @@ func VStudioBackend::getProjectExt(const ProjectRef proj) -> string
 //----------------------------------------------------------------------------------------------------------------------
 // getIncludePaths
 
-func VStudioBackend::getIncludePaths(const ProjectRef proj) -> string
+func VStudioBackend::getIncludePaths(const Project* proj) -> vector<string>
 {
     auto projPath = proj->rootPath / "_make";
 
@@ -312,18 +312,20 @@ func VStudioBackend::getIncludePaths(const ProjectRef proj) -> string
     set<Project *> deps = getProjectCompleteDeps(proj);
     for (const Project* proj : deps)
     {
-        incPaths.emplace_back(fs::relative(proj->rootPath / "inc", projPath));
+        incPaths.emplace_back(fs::canonical(proj->rootPath / "inc"));
+        //incPaths.emplace_back(fs::relative(proj->rootPath / "inc", projPath));
     }
 
     //
     // Add paths
     //
-
-    incPaths.emplace_back(fs::relative(proj->rootPath / "src", projPath));
+    incPaths.emplace_back(fs::canonical(proj->rootPath / "src"));
+    //incPaths.emplace_back(fs::relative(proj->rootPath / "src", projPath));
 
     if (proj->appType == AppType::Library || proj->appType == AppType::DynamicLibrary)
     {
-        incPaths.emplace_back(fs::relative(proj->rootPath / "inc", projPath));
+        incPaths.emplace_back(fs::canonical(proj->rootPath / "inc"));
+        //incPaths.emplace_back(fs::relative(proj->rootPath / "inc", projPath));
     }
 
     //
@@ -333,13 +335,13 @@ func VStudioBackend::getIncludePaths(const ProjectRef proj) -> string
     vector<string> strings;
     transform(incPaths.begin(), incPaths.end(), back_inserter(strings), 
         [](const fs::path& path) -> string { return path.string(); });
-    return join(strings, ";");
+    return strings;
 }
 
 //----------------------------------------------------------------------------------------------------------------------
 // getLibraries
 
-func VStudioBackend::getLibraries(const ProjectRef proj) -> string
+func VStudioBackend::getLibraries(const Project* proj) -> vector<string>
 {
     auto projPath = proj->rootPath / "_make";
 
@@ -351,13 +353,13 @@ func VStudioBackend::getLibraries(const ProjectRef proj) -> string
         libs.emplace_back(proj->name + ".lib");
     }
 
-    return join(libs, ";");
+    return libs;
 }
 
 //----------------------------------------------------------------------------------------------------------------------
 // getLibraryPaths
 
-func VStudioBackend::getLibraryPaths(const ProjectRef proj, BuildType buildType) -> string
+func VStudioBackend::getLibraryPaths(const Project* proj, BuildType buildType) -> vector<string>
 {
     auto projPath = proj->rootPath / "_make";
     string buildString = buildType == BuildType::Debug ? "debug" : "release";
@@ -374,7 +376,7 @@ func VStudioBackend::getLibraryPaths(const ProjectRef proj, BuildType buildType)
     transform(libPaths.begin(), libPaths.end(), back_inserter(libPathStrings),
         [](const fs::path& path) -> string { return path.string(); });
 
-    return join(libPathStrings, ";");
+    return libPathStrings;
 }
 
 //----------------------------------------------------------------------------------------------------------------------
@@ -391,7 +393,7 @@ func VStudioBackend::generatePrj(const ProjectRef proj) -> bool
     auto projPath = proj->rootPath / "_make";
     if (!ensurePath(env.cmdLine, fs::path(projPath))) return false;
 
-    string includeDirectories = getIncludePaths(proj) + ";" + join(vs.includePaths, ";");
+    string includeDirectories = join(getIncludePaths(proj.get()), ";") + ";" + join(vs.includePaths, ";");
 
     XmlNode* includeGroup = nullptr;
     XmlNode* compileGroup = nullptr;
@@ -482,8 +484,8 @@ func VStudioBackend::generatePrj(const ProjectRef proj) -> bool
                     .text("GenerateDebugInformation", {}, "true")
                     .text("TreatLinkerWarningAsErrors", {}, "true")
                     .text("AdditionalOptions", {}, "/DEBUG:FULL %(AdditionalOptions)")
-                    .text("AdditionalDependencies", {}, getLibraries(proj) + ";%(AdditionalDependencies)")
-                    .text("AdditionalLibraryDirectories", {}, getLibraryPaths(proj, BuildType::Debug) + ";%(AdditionalLibraryDirectories)")
+                    .text("AdditionalDependencies", {}, join(getLibraries(proj.get()), ";") + ";%(AdditionalDependencies)")
+                    .text("AdditionalLibraryDirectories", {}, join(getLibraryPaths(proj.get(), BuildType::Debug), ";") + ";%(AdditionalLibraryDirectories)")
                 .end()
             .end()
             .tag("ItemDefinitionGroup", { {"Condition", "'$(Configuration)|$(Platform)'=='Release|x64'"}})
@@ -507,8 +509,8 @@ func VStudioBackend::generatePrj(const ProjectRef proj) -> bool
                     .text("OptimizeReferences", {}, "true")
                     .text("GenerateDebugInformation", {}, "true")
                     .text("TreatLinkerWarningAsErrors", {}, "true")
-                    .text("AdditionalDependencies", {}, getLibraries(proj) + ";%(AdditionalDependencies)")
-                    .text("AdditionalLibraryDirectories", {}, getLibraryPaths(proj, BuildType::Release) + ";%(AdditionalLibraryDirectories)")
+                    .text("AdditionalDependencies", {}, join(getLibraries(proj.get()), ";") + ";%(AdditionalDependencies)")
+                    .text("AdditionalLibraryDirectories", {}, join(getLibraryPaths(proj.get(), BuildType::Release), ";") + ";%(AdditionalLibraryDirectories)")
                 .end()
             .end()
             .tag("ItemGroup", {}, &includeGroup)
@@ -525,10 +527,10 @@ func VStudioBackend::generatePrj(const ProjectRef proj) -> bool
             .end()
         .end();
 
-    auto [includeApiFolder, includeTestFolder] = whichFolders(proj);
+    auto [includeApiFolder, includeTestFolder] = whichFolders(proj.get());
 
-    function<void (const NodeRef)> genLinks = [includeGroup, compileGroup, &projPath, &genLinks,
-        includeTestFolder, includeApiFolder](const NodeRef node) {
+    function<void (const unique_ptr<Node>&)> genLinks = [includeGroup, compileGroup, &projPath, &genLinks,
+        includeTestFolder, includeApiFolder](const unique_ptr<Node>& node) {
         switch (node->type)
         {
         case Node::Type::SourceFile:
@@ -583,7 +585,7 @@ func VStudioBackend::generatePrj(const ProjectRef proj) -> bool
 //----------------------------------------------------------------------------------------------------------------------
 // generateFilters
 
-func VStudioBackend::generateFilters(const ProjectRef& proj) -> bool
+func VStudioBackend::generateFilters(const ProjectRef proj) -> bool
 {
     Env& env = proj->env;
 
@@ -608,11 +610,11 @@ func VStudioBackend::generateFilters(const ProjectRef& proj) -> bool
 
     auto projPath = env.rootPath / "_make";
 
-    auto[includeApiFolder, includeTestFolder] = whichFolders(proj);
+    auto[includeApiFolder, includeTestFolder] = whichFolders(proj.get());
 
-    function<void(const NodeRef)> genFolders = 
+    function<void(const unique_ptr<Node>&)> genFolders = 
         [includesNode, compilesNode, foldersNode, &proj, &env, &projPath, &genFolders, includeTestFolder, includeApiFolder]
-    (const NodeRef node) 
+    (const unique_ptr<Node>& node)
     {
         switch (node->type)
         {
@@ -704,7 +706,7 @@ VStudioBackend::VStudioBackend()
 //----------------------------------------------------------------------------------------------------------------------
 // whichFolders
 
-func VStudioBackend::whichFolders(const ProjectRef proj) -> tuple<bool, bool>
+func VStudioBackend::whichFolders(const Project* proj) -> tuple<bool, bool>
 {
     return {
         (proj->appType == AppType::Library || proj->appType == AppType::DynamicLibrary),
@@ -751,356 +753,373 @@ func VStudioBackend::launchIde(const WorkspaceRef workspace) -> void
 
 //----------------------------------------------------------------------------------------------------------------------
 
-func VStudioBackend::build(const WorkspaceRef ws) -> BuildState
+func VStudioBackend::build(const WorkspaceRef workspace) -> BuildState
 {
-    ProjectRef proj = ws->projects.back();
-    Env& env = proj->env;
+    ProjectRef proj = workspace->projects.back();
     if (proj->appType == AppType::DynamicLibrary)
     {
-        error(env.cmdLine, "DLL support is unimplemented.");
+        error(proj->env.cmdLine, "DLL support is unimplemented.");
         return BuildState::Failed;
     }
 
-    //
-    // Build C++ files
-    //
-
-    vector<string> objs;
     fs::path buildTypeFolder = (proj->env.buildType == BuildType::Release) ? "release" : "debug";
     int numCompiledFiles = 0;
 
-    // Recurse all through the nodes, applying the lambda for each one.
-    // #todo: move this to a recursive function that goes through all dependencies
-    auto[includeApiFolder, includeTestFolder] = whichFolders(proj);
-    bool usePch = false;
-    optional<string> pchFile;
-
-    function<bool(const NodeRef)> buildNodes =
-        [this, &buildNodes, &numCompiledFiles, &objs, &proj, &buildTypeFolder, includeApiFolder, includeTestFolder, &env, 
-        &usePch, &pchFile]
-    (const NodeRef node) -> bool
+    //
+    // Step 1 - Determine build order
+    //
+    vector<const Project*> projects;
+    function<void(const Project *)> gatherDeps = [&gatherDeps, &projects](const Project* proj)
     {
-        switch (node->type)
+        if (find(projects.begin(), projects.end(), proj) == projects.end())
         {
-        case Node::Type::ApiFolder:
-        case Node::Type::TestFolder:
-        case Node::Type::SourceFolder:
-        case Node::Type::Root:
-            if (node->type == Node::Type::ApiFolder && !includeApiFolder) return true;
-            if (node->type == Node::Type::TestFolder && !includeTestFolder) return true;
-
-            for (auto& subnode : node->nodes)
+            for (const auto& dep : proj->deps)
             {
-                if (!buildNodes(subnode)) return false;
-            }
-            break;
-
-        case Node::Type::HeaderFile:
-            break;
-
-        case Node::Type::SourceFile:
-        case Node::Type::PchFile:
-            {
-                fs::path srcPath = node->fullPath;
-                fs::path objPath = env.rootPath / "_obj" / buildTypeFolder / fs::relative(node->fullPath, env.rootPath);
-                objPath.replace_extension(".obj");
-                objs.push_back(objPath.string());
-
-                bool build = false;
-                if (!fs::exists(objPath)) build = true;
-                else
+                if (find(projects.begin(), projects.end(), dep.proj) == projects.end())
                 {
-                    auto ts = fs::last_write_time(srcPath);
-                    auto to = fs::last_write_time(objPath);
+                    gatherDeps(dep.proj);
+                }
+            }
 
-                    if (ts > to) build = true;
+            projects.push_back(proj);
+        }
+    };
+    gatherDeps(proj.get());
+
+    //
+    // Step 2 - Build each project
+    //
+
+    for (const auto& proj : projects)
+    {
+        auto[includeApiFolder, includeTestFolder] = whichFolders(proj);
+        bool usePch = false;
+        optional<string> pchFile;
+        msg(proj->env.cmdLine, "Building", stringFormat("Building project `{0}`...", proj->name));
+        vector<string> objs;
+
+        function<bool(const unique_ptr<Node>&)> buildNodes =
+            [this, &buildNodes, &numCompiledFiles, &proj, &buildTypeFolder, &usePch, &pchFile,
+            &includeApiFolder, &includeTestFolder, &objs]
+        (const unique_ptr<Node>& node) -> bool
+        {
+            switch(node->type)
+            {
+            case Node::Type::ApiFolder:
+            case Node::Type::TestFolder:
+            case Node::Type::SourceFolder:
+            case Node::Type::Root:
+                if (node->type == Node::Type::ApiFolder && !includeApiFolder) return true;
+                if (node->type == Node::Type::TestFolder && !includeTestFolder) return true;
+
+                for (auto& subNode : node->nodes)
+                {
+                    if (!buildNodes(subNode)) return false;
+                }
+                break;
+
+            case Node::Type::HeaderFile:
+                break;
+
+            case Node::Type::SourceFile:
+            case Node::Type::PchFile:
+                {
+                    fs::path srcPath = node->fullPath;
+                    fs::path objPath = proj->rootPath / "_obj" / buildTypeFolder / fs::relative(node->fullPath, proj->rootPath);
+                    objPath.replace_extension(".obj");
+                    objs.push_back(objPath.string());
+
+                    bool build = false;
+                    if (!fs::exists(objPath)) build = true;
                     else
                     {
-                        // Check dependencies
-                        scanDependencies(proj, node);
-                        for (auto& dep : node->deps)
+                        auto ts = fs::last_write_time(srcPath);
+                        auto to = fs::last_write_time(objPath);
+
+                        if (ts > to) build = true;
+                        else
                         {
-                            auto ts = fs::last_write_time(dep);
-                            if (ts > to)
+                            // Check dependencies
+
+                            // #todo: Move this to workspace building?
+                            scanDependencies(proj, node);
+
+                            for (auto& srcDep : node->deps)
                             {
-                                build = true;
-                                break;
+                                auto ts = fs::last_write_time(srcDep);
+                                if (ts > to)
+                                {
+                                    build = true;
+                                    break;
+                                }
                             }
                         }
                     }
-                }
 
-                if (build)
-                {
-                    if (!ensurePath(env.cmdLine, objPath.parent_path()))
+                    if (build)
                     {
-                        error(env.cmdLine, stringFormat("Unable to create folder `{0}`.", objPath.parent_path().string()));
-                        return false;
-                    }
-
-                    string cmd = m_compiler.string();
-                    Lines errorLines;
-
-                    // #todo: Add multiple include paths for dependencies.
-                    vector<string> args = {
-                        "/nologo",
-                        "/EHsc",
-                        "/c",
-                        "/Zi",
-                        "/W3",
-                        "/WX",
-                        env.buildType == BuildType::Release ? "/MT" : "/MTd",
-                        "/std:c++17",
-                        "/Fd\"" + (env.rootPath / "_obj" / buildTypeFolder / "vc141.pdb").string() + "\"",
-                        "/Fo\"" + objPath.string() + "\"",
-                        "\"" + srcPath.string() + "\"",
-                        "/I\"" + (env.rootPath / "src").string() + "\""
-                    };
-
-                    // Check for pre-compiled header.
-                    if (usePch)
-                    {
-                        string flag = node->type == Node::Type::PchFile ? "/Yc" : "/Yu";
-                        args.emplace_back(flag + *pchFile);
-                        auto pchPath = env.rootPath / "_obj" / (proj->name + ".pch");
-                        args.emplace_back(string("/Fp") + pchPath.string());
-                    }
-
-                    // DLLs and Libs have a "inc" folder for their public APIs.  Add this to the include paths
-                    if (proj->appType != AppType::Exe)
-                    {
-                        args.emplace_back(string("/I\"") + (env.rootPath / "inc").string() + "\"");
-                    }
-
-                    // Add the compiler's standard include paths.
-                    for (const auto& path : m_includePaths)
-                    {
-                        args.emplace_back(string("/I\"") + path.string() + "\"");
-                    }
-
-                    if (env.cmdLine.flag("v") || env.cmdLine.flag("verbose"))
-                    {
-                        string line = cmd;
-                        for (const auto& arg : args)
+                        if (!ensurePath(proj->env.cmdLine, objPath.parent_path()))
                         {
-                            line += " " + arg;
+                            return error(proj->env.cmdLine, stringFormat("Unable to create folder `{0}`.", objPath.parent_path().string()));
                         }
-                        msg(env.cmdLine, "Running", line);
-                    }
 
-                    msg(env.cmdLine, "Compiling", srcPath.string());
-                    Process p(move(cmd), move(args), fs::current_path(),
-                        [&errorLines](const char* buffer, size_t len) { errorLines.feed(buffer, len); },
-                        [&errorLines](const char* buffer, size_t len) { errorLines.feed(buffer, len); });
+                        string cmd = m_compiler.string();
+                        Lines errorLines;
 
-                    if (p.get())
-                    {
-                        // Non-zero result means a failed compilation.
-                        error(env.cmdLine, stringFormat("Compilation of `{0}` failed.", srcPath.string()));
-                        errorLines.generate();
-                        for (const auto& line : errorLines)
+                        vector<string> args = {
+                            "/nologo",
+                            "/EHsc",
+                            "/c",
+                            "/Zi",
+                            "/W3",
+                            "/WX",
+                            proj->env.buildType == BuildType::Release ? "/MT" : "/MTd",
+                            "/std:c++17",
+                            "/Fd\"" + (proj->env.rootPath / "_obj" / buildTypeFolder / "vc141.pdb").string() + "\"",
+                            "/Fo\"" + objPath.string() + "\"",
+                            "\"" + srcPath.string() + "\"",
+                            //"/I\"" + (env.rootPath / "src").string() + "\""
+                        };
+
+                        vector<string> incPaths = getIncludePaths(proj);
+                        for (const auto& path : incPaths)
                         {
-                            cout << line << endl;
+                            args.emplace_back(string("/I\"") + path + "\"");
                         }
-                        return false;
-                    }
 
-                    ++numCompiledFiles;
+                        // Check for pre-compiled header
+                        if (usePch)
+                        {
+                            string flag = node->type == Node::Type::PchFile ? "/Yc" : "/Yu";
+                            args.emplace_back(flag + *pchFile);
+                            auto pchPath = proj->rootPath / "_obj" / (proj->name + ".pch");
+                            args.emplace_back(string("/Fp") + pchPath.string());
+                        }
+
+                        // Add the compiler's standard include paths.
+                        for (const auto& path : m_includePaths)
+                        {
+                            args.emplace_back(string("/I\"") + path.string() + "\"");
+                        }
+
+                        // Check for verbosity.
+                        if (proj->env.cmdLine.flag("v") || proj->env.cmdLine.flag("verbose"))
+                        {
+                            string line = cmd;
+                            for (const auto& arg : args)
+                            {
+                                line += " " + arg;
+                            }
+                            msg(proj->env.cmdLine, "Running", line);
+                        }
+
+                        msg(proj->env.cmdLine, "Compiling", srcPath.string());
+                        Process p(move(cmd), move(args), fs::current_path(),
+                            [&errorLines](const char* buffer, size_t len) { errorLines.feed(buffer, len); },
+                            [&errorLines](const char* buffer, size_t len) { errorLines.feed(buffer, len); });
+
+                        if (p.get())
+                        {
+                            // Non-zero result means a failed compilation.
+                            error(proj->env.cmdLine, stringFormat("Compilation of `{0}` failed.", srcPath.string()));
+                            errorLines.generate();
+                            for (const auto& line : errorLines)
+                            {
+                                cout << line << endl;
+                            }
+                            return false;
+                        }
+
+                        ++numCompiledFiles;
+                    } // if (build)
                 }
-            }
-            break;
+                break;
+            } // switch
 
-        }
+            return true;
+        };
 
-        return true;
-    };
+        //
+        // Pre-compiled header
+        //
 
-    //
-    // Pre-compiled header
-    //
-
-    pchFile = proj->config.tryGet("build.pch");
-    if (pchFile)
-    {
-        usePch = true;
-        fs::path pchPath = env.rootPath / "_obj" / "pch.cc";
-        if (!ensurePath(env.cmdLine, env.rootPath / "_obj")) return BuildState::Failed;
-        TextFile pchTextFile{ fs::path(pchPath) };
-        pchTextFile << (string("#include <") + *pchFile + ">\n");
-        pchTextFile.write();
-
-        auto node = make_unique<Node>(Node::Type::PchFile, move(pchPath));
-        if (!buildNodes(node))
+        pchFile = proj->config.tryGet("build.pch");
+        if (pchFile)
         {
-            return BuildState::Failed;
-        }
-    }
+            usePch = true;
+            fs::path pchPath = proj->env.rootPath / "_obj" / "pch.cc";
+            if (!ensurePath(proj->env.cmdLine, proj->rootPath / "_obj")) return BuildState::Failed;
+            TextFile pchTextFile{ fs::path(pchPath) };
+            pchTextFile << (string("#include <") + *pchFile + ">\n");
+            pchTextFile.write();
 
-    //
-    // Build all nodes
-    //
-
-    if (!buildNodes(proj->rootNode))
-    {
-        return BuildState::Failed;
-    }
-
-    if (numCompiledFiles == 0)
-    {
-        return BuildState::NoWork;
-    }
-
-    //
-    // Linking or library production
-    // #todo: Support DLLs
-    //
-    Lines errorLines;
-    fs::path binPath = env.rootPath / "_bin" / buildTypeFolder;
-    string ext;
-
-    switch (proj->appType)
-    {
-    case AppType::Exe:              ext = ".exe"; break;
-    case AppType::Library:          ext = ".lib"; break;
-    case AppType::DynamicLibrary:   ext = ".dll"; break;
-    default: assert(0);
-    }
-
-    fs::path outPath = binPath / (proj->name + ext);
-    fs::path pdbPath = binPath / (proj->name + ".pdb");
-
-    if (!fs::exists(outPath) || (numCompiledFiles > 0))
-    {
-        if (!ensurePath(env.cmdLine, outPath.parent_path()))
-        {
-            error(env.cmdLine, stringFormat("Unable to create folder `{0}`.", outPath.string()));
-            return BuildState::Failed;
-        }
-        bool release = (env.buildType == BuildType::Release);
-
-        if (proj->appType == AppType::Exe ||
-            proj->appType == AppType::DynamicLibrary)
-        {
-            // An executable requires link.exe
-            auto cmd = m_linker.string();
-            vector<string> args =
+            auto node = make_unique<Node>(Node::Type::PchFile, move(pchPath));
+            if (!buildNodes(node))
             {
-                "/nologo",
-                string("/OUT:\"") + outPath.string() + "\"",
-                "/WX",
-                release ? "/DEBUG:NONE" : "/DEBUG:FULL",
-                string("/PDB:\"") + pdbPath.string() + "\"",
-                proj->ssType == SubsystemType::Console ? "/SUBSYSTEM:CONSOLE" : "/SUBSYSTEM:WINDOWS",
-                release ? "/OPT:REF" : "",
-                release ? "/OPT:ICF" : "",
-                "/MACHINE:X64"
-            };
-
-            // Add compiler's library paths.
-            // #todo: Add dependency library paths.
-            for (const auto& path : m_libPaths)
-            {
-                args.emplace_back(string("/LIBPATH:\"") + path.string() + "\"");
-            }
-
-            // Add compiled objects.
-            for (const auto& obj : objs) 
-            {
-                args.emplace_back(obj); 
-            }
-
-            // Add libraries mentioned in forge.ini
-            string libs = proj->config.get("build.libs");
-            vector<string> libsVector = split(libs, ";");
-            for (const auto& lib : libsVector)
-            {
-                args.emplace_back(lib + ".lib");
-            }
-
-            if (env.cmdLine.flag("v") || env.cmdLine.flag("verbose"))
-            {
-                string line = cmd;
-                for (const auto& arg : args)
-                {
-                    line += " " + arg;
-                }
-                msg(env.cmdLine, "Running", line);
-            }
-
-            msg(env.cmdLine, "Linking", outPath.string());
-            Process p(move(cmd), move(args), fs::current_path(),
-                [&errorLines](const char* buffer, size_t len) { errorLines.feed(buffer, len); },
-                [&errorLines](const char* buffer, size_t len) { errorLines.feed(buffer, len); });
-
-            if (p.get())
-            {
-                error(env.cmdLine, stringFormat("Linking of `{0}` failed.", outPath.string()));
-                errorLines.generate();
-                for (const auto& line : errorLines)
-                {
-                    cout << line << endl;
-                }
                 return BuildState::Failed;
             }
         }
-        else
+
+        //
+        // Build all nodes
+        //
+
+        const unique_ptr<Node>& rootNode = proj->rootNode;
+        if (!buildNodes(rootNode))
         {
-            // Generating a library with lib.exe
-            auto cmd = m_lib.string();
-            vector<string> args =
-            {
-                "/NOLOGO",
-                "/WX",
-                string("/OUT:\"") + outPath.string() + "\"",
-            };
+            return BuildState::Failed;
+        }
 
-            // Add compiled objects.
-            for (const auto& obj : objs)
-            {
-                args.emplace_back(obj);
-            }
+        //
+        // Linking or library production
+        // #todo: Support DLLs
+        //
+        Lines errorLines;
+        fs::path binPath = proj->rootPath / "_bin" / buildTypeFolder;
+        string ext;
 
-            if (env.cmdLine.flag("v") || env.cmdLine.flag("verbose"))
-            {
-                string line = cmd;
-                for (const auto& arg : args)
-                {
-                    line += " " + arg;
-                }
-                msg(env.cmdLine, "Running", line);
-            }
+        switch (proj->appType)
+        {
+        case AppType::Exe:              ext = ".exe"; break;
+        case AppType::Library:          ext = ".lib"; break;
+        case AppType::DynamicLibrary:   ext = ".dll"; break;
+        default: assert(0);
+        }
 
-            msg(env.cmdLine, "Archiving", outPath.string());
-            Process p(move(cmd), move(args), fs::current_path(),
-                [&errorLines](const char* buffer, size_t len) { errorLines.feed(buffer, len); },
-                [&errorLines](const char* buffer, size_t len) { errorLines.feed(buffer, len); });
+        fs::path outPath = binPath / (proj->name + ext);
+        fs::path pdbPath = binPath / (proj->name + ".pdb");
 
-            if (p.get())
+        if (!fs::exists(outPath) || (numCompiledFiles > 0))
+        {
+            if (!ensurePath(proj->env.cmdLine, outPath.parent_path()))
             {
-                error(env.cmdLine, stringFormat("Creation of `{0}` failed.", outPath.string()));
-                errorLines.generate();
-                for (const auto& line : errorLines)
-                {
-                    cout << line << endl;
-                }
+                error(proj->env.cmdLine, stringFormat("Unable to create folder `{0}`.", outPath.string()));
                 return BuildState::Failed;
             }
+            bool release = (proj->env.buildType == BuildType::Release);
+
+            if (proj->appType == AppType::Exe ||
+                proj->appType == AppType::DynamicLibrary)
+            {
+                // An executable requires link.exe
+                auto cmd = m_linker.string();
+                vector<string> args =
+                {
+                    "/nologo",
+                    string("/OUT:\"") + outPath.string() + "\"",
+                    "/WX",
+                    release ? "/DEBUG:NONE" : "/DEBUG:FULL",
+                    string("/PDB:\"") + pdbPath.string() + "\"",
+                    proj->ssType == SubsystemType::Console ? "/SUBSYSTEM:CONSOLE" : "/SUBSYSTEM:WINDOWS",
+                    release ? "/OPT:REF" : "",
+                    release ? "/OPT:ICF" : "",
+                    "/MACHINE:X64"
+                };
+
+                // Add compiler's library paths.
+                // #todo: Add dependency library paths.
+                for (const auto& path : getLibraryPaths(proj, proj->env.buildType))
+                {
+                    args.emplace_back(string("/LIBPATH:\"") + path + "\"");
+                }
+                for (const auto& path : m_libPaths)
+                {
+                    args.emplace_back(string("/LIBPATH:\"") + path.string() + "\"");
+                }
+
+                for (const auto& path : getLibraries(proj))
+                {
+                    args.emplace_back(string("\"") + path + "\"");
+                }
+
+                // Add compiled objects.
+                for (const auto& obj : objs) 
+                {
+                    args.emplace_back(obj); 
+                }
+
+                // Add libraries mentioned in forge.ini
+                string libs = proj->config.get("build.libs");
+                vector<string> libsVector = split(libs, ";");
+                for (const auto& lib : libsVector)
+                {
+                    args.emplace_back(lib + ".lib");
+                }
+
+                if (proj->env.cmdLine.flag("v") || proj->env.cmdLine.flag("verbose"))
+                {
+                    string line = cmd;
+                    for (const auto& arg : args)
+                    {
+                        line += " " + arg;
+                    }
+                    msg(proj->env.cmdLine, "Running", line);
+                }
+
+                msg(proj->env.cmdLine, "Linking", outPath.string());
+                Process p(move(cmd), move(args), fs::current_path(),
+                    [&errorLines](const char* buffer, size_t len) { errorLines.feed(buffer, len); },
+                    [&errorLines](const char* buffer, size_t len) { errorLines.feed(buffer, len); });
+
+                if (p.get())
+                {
+                    error(proj->env.cmdLine, stringFormat("Linking of `{0}` failed.", outPath.string()));
+                    errorLines.generate();
+                    for (const auto& line : errorLines)
+                    {
+                        cout << line << endl;
+                    }
+                    return BuildState::Failed;
+                }
+            }
+            else
+            {
+                // Generating a library with lib.exe
+                auto cmd = m_lib.string();
+                vector<string> args =
+                {
+                    "/NOLOGO",
+                    "/WX",
+                    string("/OUT:\"") + outPath.string() + "\"",
+                };
+
+                // Add compiled objects.
+                for (const auto& obj : objs)
+                {
+                    args.emplace_back(obj);
+                }
+
+                if (proj->env.cmdLine.flag("v") || proj->env.cmdLine.flag("verbose"))
+                {
+                    string line = cmd;
+                    for (const auto& arg : args)
+                    {
+                        line += " " + arg;
+                    }
+                    msg(proj->env.cmdLine, "Running", line);
+                }
+
+                msg(proj->env.cmdLine, "Archiving", outPath.string());
+                Process p(move(cmd), move(args), fs::current_path(),
+                    [&errorLines](const char* buffer, size_t len) { errorLines.feed(buffer, len); },
+                    [&errorLines](const char* buffer, size_t len) { errorLines.feed(buffer, len); });
+
+                if (p.get())
+                {
+                    error(proj->env.cmdLine, stringFormat("Creation of `{0}` failed.", outPath.string()));
+                    errorLines.generate();
+                    for (const auto& line : errorLines)
+                    {
+                        cout << line << endl;
+                    }
+                    return BuildState::Failed;
+                }
+            }
         }
-    }
-    else
-    {
-        return BuildState::NoWork;
-    }
+
+    } // for each project
 
     return BuildState::Success;
-}
-
-//----------------------------------------------------------------------------------------------------------------------
-// buildProject
-
-func VStudioBackend::buildProject(const ProjectRef project) -> BuildState
-{
-    return BuildState::NoWork;
 }
 
 //----------------------------------------------------------------------------------------------------------------------

@@ -26,16 +26,12 @@ func cmd_build(const Env& env) -> int
     switch (state)
     {
     case BuildState::Success:
-        msg(env.cmdLine, "Finished", stringFormat("`{0}` built.", ws->projects[0]->name));
+    case BuildState::NoWork:
         return 0;
 
     case BuildState::Failed:
         error(env.cmdLine, "Compilation failed.");
         return 1;
-
-    case BuildState::NoWork:
-        msg(env.cmdLine, "Finished", "Already up to date.");
-        return 0;
     }
 
     assert(0);

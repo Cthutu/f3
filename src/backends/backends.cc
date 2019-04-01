@@ -36,7 +36,7 @@ func getBackend(const CmdLine& cmdLine) -> unique_ptr<IBackend>
 //----------------------------------------------------------------------------------------------------------------------
 // Include paths
 
-func IBackend::getIncludePaths(const ProjectRef proj, vector<fs::path>& paths) -> void
+func IBackend::getIncludePaths(const Project* proj, vector<fs::path>& paths) -> void
 {
     // #todo: Handle dependent projects
     paths.emplace_back(proj->rootPath / "src");
@@ -49,7 +49,7 @@ func IBackend::getIncludePaths(const ProjectRef proj, vector<fs::path>& paths) -
 //----------------------------------------------------------------------------------------------------------------------
 // Library paths
 
-func IBackend::getLibPaths(const ProjectRef proj, BuildType buildType, vector<fs::path>& paths) -> void
+func IBackend::getLibPaths(const Project* proj, BuildType buildType, vector<fs::path>& paths) -> void
 {
     // #todo: Handle dependent projects
     if (proj->appType != AppType::Exe)
@@ -61,7 +61,7 @@ func IBackend::getLibPaths(const ProjectRef proj, BuildType buildType, vector<fs
 //----------------------------------------------------------------------------------------------------------------------
 // Backend utility methods
 
-func IBackend::scanDependencies(const ProjectRef proj, NodeRef node) -> void
+func IBackend::scanDependencies(const Project* proj, const unique_ptr<Node>& node) -> void
 {
     vector<fs::path> includePaths;
     getIncludePaths(proj, includePaths);

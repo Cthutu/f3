@@ -40,8 +40,6 @@ struct Node
     {}
 };
 
-using NodeRef = std::unique_ptr<Node>&;
-
 //----------------------------------------------------------------------------------------------------------------------
 // Project
 //
@@ -102,7 +100,7 @@ using WorkspaceRef = std::unique_ptr<Workspace>&;
 //----------------------------------------------------------------------------------------------------------------------
 
 func buildWorkspace(const Env& env) -> std::unique_ptr<Workspace>;
-func getProjectCompleteDeps(const ProjectRef proj) -> std::set<Project *>;
+func getProjectCompleteDeps(const Project* proj) -> std::set<Project *>;
 
 //----------------------------------------------------------------------------------------------------------------------
 //----------------------------------------------------------------------------------------------------------------------
