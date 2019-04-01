@@ -74,6 +74,10 @@ func processDeps(Workspace& ws, const Env& env, ProjectRef& proj) -> bool
         {
             // Local library
             d.name = elems[1];
+            if (d.name == proj->name)
+            {
+                return error(env.cmdLine, "A project cannot depend on itself.  Check [dependencies] in the forge.ini file.");
+            }
             fs::path projPath = fs::canonical(proj->rootPath / value);
             Env newEnv(env, move(projPath));
             if (!buildProject(ws, newEnv)) return false;

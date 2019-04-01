@@ -19,6 +19,11 @@ func cmd_build(const Env& env) -> int
     if (!backEnd) return 1;
 
     auto ws = buildWorkspace(env);
+    if (!ws)
+    {
+        error(env.cmdLine, "Build failed.");
+        return 1;
+    }
     // env is no longer valid from this point onwards!!!  Fetch it from ws->mainProject->env.
 
     auto state = backEnd->build(ws);

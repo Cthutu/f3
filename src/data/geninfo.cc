@@ -126,6 +126,7 @@ GenInfo::GenInfo(const CmdLine& cmdLine)
         textFiles.back() << "auto main(int argc, char** argv) -> int";
         textFiles.back() << "{";
         textFiles.back() << "    std::cout << \"Hello, World!\" << std::endl;";
+        textFiles.back() << "    return 0;";
         textFiles.back() << "}";
         textFiles.back() << "";
     }
@@ -137,7 +138,7 @@ GenInfo::GenInfo(const CmdLine& cmdLine)
         textFiles.back() << "auto hello() -> void;";
         textFiles.back() << "";
         
-        textFiles.emplace_back(srcPath / "hello.cc");
+        textFiles.emplace_back(srcPath / (projName + ".cc"));
         textFiles.back() << stringFormat("#include <{0}/{0}.h>", projName);
         textFiles.back() << "#include <iostream>";
         textFiles.back() << "";
