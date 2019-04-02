@@ -32,7 +32,7 @@ func scanSrc(unique_ptr<Node>& root, const fs::path& path, Node::Type folderType
             else
             {
                 string ext = path.extension().string();
-                if (ext == ".cc" || ext == ".cpp")
+                if (ext == ".cc" || ext == ".cpp" || ext == ".c")
                 {
                     auto ccnode = make_unique<Node>(Node::Type::SourceFile, fs::path(path));
                     fnode->nodes.push_back(move(ccnode));
