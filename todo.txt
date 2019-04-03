@@ -1,7 +1,9 @@
 [ ] - Edit command should generate dep project files locally
-[ ] - Don't unnecessarily recompile pch file
-[ ] - Add include and library paths and libraries to build command
+[X] - Don't unnecessarily recompile pch file
+[X] - Add include and library paths and libraries to build command
 [ ] - Check that dependencies are libraries
-[ ] - Fix bug where library source is always hello.cc
+[X] - Fix bug where library source is always hello.cc
 [ ] - Move include/lib paths code to backend base class
-[X] - Implement build command to handle dependencies
+
+[ ] - Add data support
+
