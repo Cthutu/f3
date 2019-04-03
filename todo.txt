@@ -6,4 +6,6 @@
 [ ] - Move include/lib paths code to backend base class
 
 [ ] - Add data support
+[ ] - Support DLLs.
+[ ] - Support unit testing.
 
