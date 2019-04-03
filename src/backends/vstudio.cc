@@ -947,11 +947,28 @@ func VStudioBackend::build(const WorkspaceRef workspace) -> BuildState
         if (pchFile)
         {
             usePch = true;
+
+            // Figure out if we need to rebuild the pch.cc file.
             fs::path pchPath = proj->env.rootPath / "_obj" / "pch.cc";
-            if (!ensurePath(proj->env.cmdLine, proj->rootPath / "_obj")) return BuildState::Failed;
-            TextFile pchTextFile{ fs::path(pchPath) };
-            pchTextFile << (string("#include <") + *pchFile + ">\n");
-            pchTextFile.write();
+            bool createPch = false;
+
+            // If the file doesn't exist, it's obvious that we need to rebuild it.
+            if (!fs::exists(pchPath))
+            {
+                createPch = true;
+            }
+            else
+            {
+                createPch = fs::last_write_time(proj->rootPath / "forge.ini") > fs::last_write_time(pchPath);
+            }
+
+            if (createPch)
+            {
+                if (!ensurePath(proj->env.cmdLine, proj->rootPath / "_obj")) return BuildState::Failed;
+                TextFile pchTextFile{ fs::path(pchPath) };
+                pchTextFile << (string("#include <") + *pchFile + ">\n");
+                pchTextFile.write();
+            }
 
             auto node = make_unique<Node>(Node::Type::PchFile, move(pchPath));
             if (!buildNodes(node))
