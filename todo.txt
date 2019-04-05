@@ -5,7 +5,10 @@
 [X] - Fix bug where library source is always hello.cc
 [ ] - Move include/lib paths code to backend base class
 
+MAJOR MILESTONES
+
 [ ] - Add data support
 [ ] - Support DLLs.
 [ ] - Support unit testing.
+[ ] - Support github.
 
