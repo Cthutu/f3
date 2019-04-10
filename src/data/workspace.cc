@@ -19,32 +19,45 @@ namespace fs = std::filesystem;
 
 func scanSrc(unique_ptr<Node>& root, const fs::path& path, Node::Type folderType) -> void
 {
-    if (fs::exists(path) && fs::is_directory(path))
+    if ((path.filename().string()[0] != '.') && fs::exists(path) && fs::is_directory(path))
     {
         auto fnode = make_unique<Node>(folderType, fs::path(path));
         for (const auto& entry : fs::directory_iterator(fnode->fullPath))
         {
             const fs::path& path = entry.path();
+
+            if (path.filename().string()[0] == '.') continue;
+
             if (fs::is_directory(path))
             {
                 scanSrc(fnode, path, folderType);
             }
             else
             {
-                string ext = path.extension().string();
-                if (ext == ".cc" || ext == ".cpp" || ext == ".c")
+                if (folderType == Node::Type::DataFolder)
                 {
-                    auto ccnode = make_unique<Node>(Node::Type::SourceFile, fs::path(path));
-                    fnode->nodes.push_back(move(ccnode));
-                }
-                else if (ext == ".h" || ext == ".hpp")
-                {
-                    auto hnode = make_unique<Node>(Node::Type::HeaderFile, fs::path(path));
-                    fnode->nodes.push_back(move(hnode));
+                    // All files in here, regardless of extension are data files.  We ignore files that start with
+                    // a period as they can be used as meta-files.
+                    auto newNode = make_unique<Node>(Node::Type::DataFile, fs::path(path));
+                    fnode->nodes.push_back(move(newNode));
                 }
                 else
                 {
-                    // Ignore all other file types.
+                    string ext = path.extension().string();
+                    if (ext == ".cc" || ext == ".cpp" || ext == ".c")
+                    {
+                        auto ccnode = make_unique<Node>(Node::Type::SourceFile, fs::path(path));
+                        fnode->nodes.push_back(move(ccnode));
+                    }
+                    else if (ext == ".h" || ext == ".hpp")
+                    {
+                        auto hnode = make_unique<Node>(Node::Type::HeaderFile, fs::path(path));
+                        fnode->nodes.push_back(move(hnode));
+                    }
+                    else
+                    {
+                        // Ignore all other file types.
+                    }
                 }
             }
         }
@@ -152,6 +165,7 @@ func buildProject(Workspace& ws, const Env& env) -> bool
     }
 
     scanSrc(p->rootNode, p->rootPath / "src", Node::Type::SourceFolder);
+    scanSrc(p->rootNode, p->rootPath / "data", Node::Type::DataFolder);
     if (p->appType == AppType::Library || p->appType == AppType::DynamicLibrary)
     {
         scanSrc(p->rootNode, p->rootPath / "inc", Node::Type::ApiFolder);

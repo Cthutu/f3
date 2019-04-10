@@ -27,6 +27,8 @@ struct Node
         TestFolder,
         ApiFolder,
         PchFile,
+        DataFolder,
+        DataFile,
     };
 
     Type                                type;           // Node type
