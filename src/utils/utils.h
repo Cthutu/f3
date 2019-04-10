@@ -26,6 +26,9 @@ func trim(std::string& s) -> void;
 
 func extractSubStr(const std::string& str, char startDelim, char endDelim) -> std::string;
 
+func symbolise(const std::string& str) -> std::string;
+func byteHexStr(u8 byte) -> std::string;
+
 func validateFileName(const std::string& str) -> bool;
 func ensurePath(const CmdLine& cmdLine, std::filesystem::path&& path) -> bool;
 

@@ -93,6 +93,49 @@ func trim(string &s) -> void
 
 //----------------------------------------------------------------------------------------------------------------------
 
+func symbolise(const string& str) -> string
+{
+    string sym;
+    for (auto c : str)
+    {
+        if ((c >= '0' && c <= '9') ||
+            (c >= 'a' && c <= 'z') ||
+            (c >= 'A' && c <= 'Z') ||
+            (c == '_') ||
+            (c == '$'))
+        {
+            sym += c;
+        }
+        else if ((c == ' ') || (c == '\\') || (c == '/') || (c == '.'))
+        {
+            sym += '_';
+        }
+    }
+
+    if (sym[0] >= '0' && sym[0] <= '9')
+    {
+        sym = string("_") + sym;
+    }
+
+    return sym;
+}
+
+//----------------------------------------------------------------------------------------------------------------------
+
+func byteHexStr(u8 byte) -> string
+{
+    u8 h = byte / 16;
+    u8 l = byte % 16;
+
+    static const char digits[] = "0123456789abcdef";
+    char hex[3] = "??";
+    hex[0] = digits[h];
+    hex[1] = digits[l];
+    return hex;
+}
+
+//----------------------------------------------------------------------------------------------------------------------
+
 func extractSubStr(const string& str, char startDelim, char endDelim) -> string
 {
     size_t start = str.find(startDelim);
