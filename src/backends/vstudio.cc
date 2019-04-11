@@ -398,6 +398,8 @@ func VStudioBackend::generatePrj(const ProjectRef proj) -> bool
 
     XmlNode* includeGroup = nullptr;
     XmlNode* compileGroup = nullptr;
+
+    buildDataFiles(proj.get(), env.buildType);
     
     rootNode
         .tag("Project", { { "DefaultTargets", "Build" }, { "ToolsVersion", "15.0" }, 
@@ -530,8 +532,18 @@ func VStudioBackend::generatePrj(const ProjectRef proj) -> bool
 
     auto [includeApiFolder, includeTestFolder] = whichFolders(proj.get());
 
-    function<void (const unique_ptr<Node>&)> genLinks = [includeGroup, compileGroup, &projPath, &genLinks,
-        includeTestFolder, includeApiFolder](const unique_ptr<Node>& node) {
+    function<void (const unique_ptr<Node>&)> genLinks = 
+        [
+            includeGroup, 
+            compileGroup, 
+            &projPath, 
+            &genLinks,
+            includeTestFolder, 
+            includeApiFolder,
+            &env,
+            &proj
+        ]
+    (const unique_ptr<Node>& node) {
         switch (node->type)
         {
         case Node::Type::SourceFile:
@@ -549,9 +561,20 @@ func VStudioBackend::generatePrj(const ProjectRef proj) -> bool
             }
             break;
 
+        case Node::Type::DataFile:
+            {
+                fs::path relPath = fs::relative(node->fullPath, proj->rootPath);
+                fs::path buildTypeFolder = env.buildType == BuildType::Debug ? "debug" : "release";
+                fs::path dataPath = fs::relative(proj->rootPath / "_obj" / buildTypeFolder / relPath, projPath);
+                dataPath.replace_extension(dataPath.extension().string() + ".cc");
+                compileGroup->tag("ClCompile", { {"Include", dataPath.string()} }).end();
+            }
+            break;
+
         case Node::Type::ApiFolder:
         case Node::Type::TestFolder:
         case Node::Type::SourceFolder:
+        case Node::Type::DataFolder:
         case Node::Type::Root:
             if (node->type == Node::Type::ApiFolder && !includeApiFolder) break;
             if (node->type == Node::Type::TestFolder && !includeTestFolder) break;
@@ -614,7 +637,17 @@ func VStudioBackend::generateFilters(const ProjectRef proj) -> bool
     auto[includeApiFolder, includeTestFolder] = whichFolders(proj.get());
 
     function<void(const unique_ptr<Node>&)> genFolders = 
-        [includesNode, compilesNode, foldersNode, &proj, &env, &projPath, &genFolders, includeTestFolder, includeApiFolder]
+        [
+            includesNode, 
+            compilesNode, 
+            foldersNode, 
+            &proj, 
+            &env, 
+            &projPath, 
+            &genFolders, 
+            includeTestFolder, 
+            includeApiFolder
+        ]
     (const unique_ptr<Node>& node)
     {
         switch (node->type)
@@ -637,9 +670,22 @@ func VStudioBackend::generateFilters(const ProjectRef proj) -> bool
             }
             break;
 
+        case Node::Type::DataFile:
+            {
+                fs::path relPath = fs::relative(node->fullPath, proj->rootPath);
+                fs::path buildTypeFolder = env.buildType == BuildType::Debug ? "debug" : "release";
+                fs::path dataPath = fs::relative(proj->rootPath / "_obj" / buildTypeFolder / relPath, projPath);
+                dataPath.replace_extension(dataPath.extension().string() + ".cc");
+                includesNode->tag("ClCompile", { {"Include", dataPath.string()} })
+                    .text("Filter", {}, fs::relative(node->fullPath.parent_path(), env.rootPath).string())
+                    .end();
+            }
+            break;
+
         case Node::Type::ApiFolder:
         case Node::Type::TestFolder:
         case Node::Type::SourceFolder:
+        case Node::Type::DataFolder:
             if (node->type == Node::Type::ApiFolder && !includeApiFolder) break;
             if (node->type == Node::Type::TestFolder && !includeTestFolder) break;
             {
@@ -914,12 +960,6 @@ func VStudioBackend::build(const WorkspaceRef workspace) -> BuildState
 
         auto dataFiles = buildDataFiles(proj, proj->env.buildType);
         if (!dataFiles) return BuildState::Failed;
-//         for (const auto& dataFile : *dataFiles)
-//         {
-//             fs::path f = dataFile;
-//             f.replace_extension(".obj");
-//             objs.push_back(f.string());
-//         }
 
         function<bool(const unique_ptr<Node>&)> buildNodes =
             [this, &buildNodes, &numCompiledFiles, &proj, &buildTypeFolder, &usePch, &pchFile,
