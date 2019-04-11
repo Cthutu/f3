@@ -961,7 +961,7 @@ func VStudioBackend::build(const WorkspaceRef workspace) -> BuildState
                         {
                             string flag = node->type == Node::Type::PchFile ? "/Yc" : "/Yu";
                             args.emplace_back(flag + *pchFile);
-                            auto pchPath = proj->rootPath / "_obj" / (proj->name + ".pch");
+                            auto pchPath = proj->rootPath / "_obj" / buildTypeFolder / (proj->name + ".pch");
                             args.emplace_back(string("/Fp") + pchPath.string());
                         }
 
@@ -1018,7 +1018,7 @@ func VStudioBackend::build(const WorkspaceRef workspace) -> BuildState
             usePch = true;
 
             // Figure out if we need to rebuild the pch.cc file.
-            fs::path pchPath = proj->env.rootPath / "_obj" / "pch.cc";
+            fs::path pchPath = proj->env.rootPath / "_obj" / buildTypeFolder / "pch.cc";
             bool createPch = false;
 
             // If the file doesn't exist, it's obvious that we need to rebuild it.
@@ -1033,7 +1033,7 @@ func VStudioBackend::build(const WorkspaceRef workspace) -> BuildState
 
             if (createPch)
             {
-                if (!ensurePath(proj->env.cmdLine, proj->rootPath / "_obj")) return BuildState::Failed;
+                if (!ensurePath(proj->env.cmdLine, proj->rootPath / "_obj" / buildTypeFolder)) return BuildState::Failed;
                 TextFile pchTextFile{ fs::path(pchPath) };
                 pchTextFile << (string("#include <") + *pchFile + ">\n");
                 pchTextFile.write();
