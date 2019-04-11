@@ -198,8 +198,6 @@ func buildWorkspace(const Env& env) -> unique_ptr<Workspace>
         return {};
     }
 
-    //ws->includePaths = includePaths(ws, ws->projects.back());
-
     return ws;
 }
 
@@ -225,77 +223,6 @@ func getProjectCompleteDeps(const Project* proj) -> set<Project *>
     scanProjects(proj);
     return projs;
 }
-
-//----------------------------------------------------------------------------------------------------------------------
-// generateBuildOrder
-
-// func generateBuildOrder(WorkspaceRef ws) -> void
-// {
-//     vector<const Project*> projs;
-//     function<bool(vector<const Project*>&, const Project*)> getBuildOrder =
-//         [&getBuildOrder](vector<const Project*>& paths, const Project* proj) -> bool
-//     {
-//         for (const auto& dep : proj->deps)
-//         {
-//             if (find(paths.begin(), paths.end(), dep.proj->rootPath) == paths.end())
-//             {
-//                 getBuildOrder(paths, dep.proj);
-//             }
-//         }
-// 
-//         if (find(paths.begin(), paths.end(), proj->rootPath) != paths.end())
-//         {
-//             return error(proj->env.cmdLine, stringFormat("Cyclic dependency on project at `{0}`.", proj->rootPath));
-//         }
-// 
-//         paths.push_back(proj);
-//         return true;
-//     };
-// 
-//     if (!getBuildOrder(projPaths, proj.get())) return {};
-// }
-// 
-// //----------------------------------------------------------------------------------------------------------------------
-// // includePaths
-// 
-// func generatePaths(const WorkspaceRef ws, const ProjectRef proj) -> vector<fs::path>
-// {
-//     // Step 1 - Generate sorted list of project dependencies.  Here we detect cyclic dependencies.
-//     vector<const Project*> projs;
-//     function<bool (vector<const Project*>&, const Project*)> getBuildOrder =
-//         [&getBuildOrder](vector<const Project*>& paths, const Project* proj) -> bool
-//     {
-//         for (const auto& dep : proj->deps)
-//         {
-//             if (find(paths.begin(), paths.end(), dep.proj->rootPath) == paths.end())
-//             {
-//                 getBuildOrder(paths, dep.proj);
-//             }
-//         }
-// 
-//         if (find(paths.begin(), paths.end(), proj->rootPath) != paths.end())
-//         {
-//             return error(proj->env.cmdLine, stringFormat("Cyclic dependency on project at `{0}`.", proj->rootPath));
-//         }
-// 
-//         paths.push_back(proj);
-//         return true;
-//     };
-// 
-//     if (!getBuildOrder(projPaths, proj.get())) return {};
-// 
-//     // Step 2 - Generate the include paths
-//     vector<fs::path> incPaths;
-//     for (const auto& proj : projs)
-//     {
-//         switch (proj->appType)
-//         {
-//         case AppType::Exe:
-//             incPaths.emplace_back(proj->rootPath / "src");
-//         }
-//     }
-//     return projPaths;
-// }
 
 //----------------------------------------------------------------------------------------------------------------------
 //----------------------------------------------------------------------------------------------------------------------
