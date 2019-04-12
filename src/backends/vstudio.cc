@@ -298,6 +298,14 @@ func VStudioBackend::getProjectExt(const ProjectRef proj) -> string
 }
 
 //----------------------------------------------------------------------------------------------------------------------
+// buildTypeFolder
+
+func VStudioBackend::buildTypeFolder(const Env& env) -> fs::path
+{
+    return env.buildType == BuildType::Debug ? "debug" : "release";
+}
+
+//----------------------------------------------------------------------------------------------------------------------
 // getIncludePaths
 
 func VStudioBackend::getIncludePaths(const Project* proj) -> vector<string>
@@ -399,7 +407,7 @@ func VStudioBackend::generatePrj(const ProjectRef proj) -> bool
     XmlNode* includeGroup = nullptr;
     XmlNode* compileGroup = nullptr;
 
-    buildDataFiles(proj.get(), env.buildType);
+    buildDataFiles(proj.get());
     
     rootNode
         .tag("Project", { { "DefaultTargets", "Build" }, { "ToolsVersion", "15.0" }, 
@@ -531,9 +539,11 @@ func VStudioBackend::generatePrj(const ProjectRef proj) -> bool
         .end();
 
     auto [includeApiFolder, includeTestFolder] = whichFolders(proj.get());
+    optional<string> pchFile = proj->config.tryGet("build.pch");
 
     function<void (const unique_ptr<Node>&)> genLinks = 
         [
+            this,
             includeGroup, 
             compileGroup, 
             &projPath, 
@@ -541,15 +551,30 @@ func VStudioBackend::generatePrj(const ProjectRef proj) -> bool
             includeTestFolder, 
             includeApiFolder,
             &env,
-            &proj
+            &proj,
+            &pchFile
         ]
     (const unique_ptr<Node>& node) {
         switch (node->type)
         {
+        case Node::Type::PchFile:
         case Node::Type::SourceFile:
             {
                 fs::path srcPath = fs::relative(node->fullPath, projPath);
-                compileGroup->tag("ClCompile", {{"Include", srcPath.string()}}).end();
+                if (pchFile)
+                {
+                    string usage = node->type == Node::Type::PchFile ? "Create" : "Use";
+                    compileGroup->tag("ClCompile", { {"Include", srcPath.string()} })
+                        .text("PrecompiledHeader", { { "Condition", "'$(Configuration)|$(Platform)' == 'Debug|x64'"} }, string(usage))
+                        .text("PrecompiledHeaderFile", { {"Condition", "'$(Configuration)|$(Platform)' == 'Debug|x64'"} }, string(*pchFile))
+                        .text("PrecompiledHeader", { { "Condition", "'$(Configuration)|$(Platform)' == 'Release|x64'"} }, string(usage))
+                        .text("PrecompiledHeaderFile", { {"Condition", "'$(Configuration)|$(Platform)' == 'Release|x64'"} }, string(*pchFile))
+                        .end();
+                }
+                else
+                {
+                    compileGroup->tag("ClCompile", {{"Include", srcPath.string()}}).end();
+                }
             }
             break;
 
@@ -564,12 +589,12 @@ func VStudioBackend::generatePrj(const ProjectRef proj) -> bool
         case Node::Type::DataFile:
             {
                 fs::path relPath = fs::relative(node->fullPath, proj->rootPath);
-                fs::path buildTypeFolder = env.buildType == BuildType::Debug ? "debug" : "release";
-                fs::path dataPath = fs::relative(proj->rootPath / "_obj" / buildTypeFolder / relPath, projPath);
+                fs::path dataPath = fs::relative(proj->rootPath / "_obj" / buildTypeFolder(env) / relPath, projPath);
                 dataPath.replace_extension(dataPath.extension().string() + ".cc");
                 compileGroup->tag("ClCompile", { {"Include", dataPath.string()} }).end();
             }
             break;
+
 
         case Node::Type::ApiFolder:
         case Node::Type::TestFolder:
@@ -586,6 +611,32 @@ func VStudioBackend::generatePrj(const ProjectRef proj) -> bool
         }
     };
     genLinks(proj->rootNode);
+
+    if (pchFile)
+    {
+        // Figure out if we need to rebuild the pch.cc file.
+        fs::path pchPath = proj->env.rootPath / "_obj" / buildTypeFolder(env) / "pch.cc";
+        bool createPch = false;
+
+        // If the file doesn't exist, it's obvious that we need to rebuild it.
+        if (!fs::exists(pchPath))
+        {
+            createPch = true;
+        }
+        else
+        {
+            createPch = fs::last_write_time(proj->rootPath / "forge.ini") > fs::last_write_time(pchPath);
+        }
+
+        if (createPch)
+        {
+            if (!buildPchFiles(proj.get())) return false;
+        }
+
+        auto node = make_unique<Node>(Node::Type::PchFile, move(pchPath));
+        genLinks(node);
+    }
+
 
     fs::path prjPath = projPath / (proj->name + ".vcxproj");
     msg(env.cmdLine, "Generating", stringFormat("Building project: `{0}`.", prjPath.string()));
@@ -638,6 +689,7 @@ func VStudioBackend::generateFilters(const ProjectRef proj) -> bool
 
     function<void(const unique_ptr<Node>&)> genFolders = 
         [
+            this,
             includesNode, 
             compilesNode, 
             foldersNode, 
@@ -673,8 +725,7 @@ func VStudioBackend::generateFilters(const ProjectRef proj) -> bool
         case Node::Type::DataFile:
             {
                 fs::path relPath = fs::relative(node->fullPath, proj->rootPath);
-                fs::path buildTypeFolder = env.buildType == BuildType::Debug ? "debug" : "release";
-                fs::path dataPath = fs::relative(proj->rootPath / "_obj" / buildTypeFolder / relPath, projPath);
+                fs::path dataPath = fs::relative(proj->rootPath / "_obj" / buildTypeFolder(env) / relPath, projPath);
                 dataPath.replace_extension(dataPath.extension().string() + ".cc");
                 includesNode->tag("ClCompile", { {"Include", dataPath.string()} })
                     .text("Filter", {}, fs::relative(node->fullPath.parent_path(), env.rootPath).string())
@@ -800,15 +851,14 @@ func VStudioBackend::launchIde(const WorkspaceRef workspace) -> void
 
 //----------------------------------------------------------------------------------------------------------------------
 
-func VStudioBackend::buildDataFiles(const Project* proj, BuildType buildType) -> optional<vector<fs::path>>
+func VStudioBackend::buildDataFiles(const Project* proj) -> optional<vector<fs::path>>
 {
     vector<fs::path> paths;
-    fs::path buildTypeFolder = buildType == BuildType::Debug ? "debug" : "release";
     function<bool(const unique_ptr<Node>&)> buildData =
         [
+            this,
             &buildData, 
             proj, 
-            &buildTypeFolder,
             &paths
         ]
     (const unique_ptr<Node>& node)
@@ -831,7 +881,7 @@ func VStudioBackend::buildDataFiles(const Project* proj, BuildType buildType) ->
                 fs::path relPath = fs::relative(node->fullPath, proj->rootPath);
                 fs::path srcPath = node->fullPath;
 
-                fs::path dataPath = proj->rootPath / "_obj" / buildTypeFolder / relPath;
+                fs::path dataPath = proj->rootPath / "_obj" / buildTypeFolder(proj->env) / relPath;
                 dataPath.replace_extension(dataPath.extension().string() + ".cc");
                 if (!ensurePath(proj->env.cmdLine, fs::path(dataPath.parent_path()))) return false;
 
@@ -906,13 +956,12 @@ func VStudioBackend::buildDataFiles(const Project* proj, BuildType buildType) ->
 
 //----------------------------------------------------------------------------------------------------------------------
 
-func VStudioBackend::buildPchFiles(const Project* proj, BuildType buildType) -> bool
+func VStudioBackend::buildPchFiles(const Project* proj) -> bool
 {
     optional<string> pchFile = proj->config.tryGet("build.pch");
     if (pchFile)
     {
-        fs::path buildTypeFolder = buildType == BuildType::Debug ? "debug" : "release";
-        fs::path pchPath = proj->env.rootPath / "_obj" / buildTypeFolder / "pch.cc";
+        fs::path pchPath = proj->env.rootPath / "_obj" / buildTypeFolder(proj->env) / "pch.cc";
         if (!ensurePath(proj->env.cmdLine, pchPath.parent_path())) return false;
         TextFile pchTextFile{ fs::path(pchPath) };
         pchTextFile << (string("#include <") + *pchFile + ">\n");
@@ -932,7 +981,6 @@ func VStudioBackend::build(const WorkspaceRef workspace) -> BuildState
         return BuildState::Failed;
     }
 
-    fs::path buildTypeFolder = (proj->env.buildType == BuildType::Release) ? "release" : "debug";
     int numCompiledFiles = 0;
 
     //
@@ -968,11 +1016,11 @@ func VStudioBackend::build(const WorkspaceRef workspace) -> BuildState
         msg(proj->env.cmdLine, "Building", stringFormat("Building project `{0}`...", proj->name));
         vector<string> objs;
 
-        auto dataFiles = buildDataFiles(proj, proj->env.buildType);
+        auto dataFiles = buildDataFiles(proj);
         if (!dataFiles) return BuildState::Failed;
 
         function<bool(const unique_ptr<Node>&)> buildNodes =
-            [this, &buildNodes, &numCompiledFiles, &proj, &buildTypeFolder, &usePch, &pchFile,
+            [this, &buildNodes, &numCompiledFiles, &proj, &usePch, &pchFile,
             &includeApiFolder, &includeTestFolder, &objs]
         (const unique_ptr<Node>& node) -> bool
         {
@@ -1001,7 +1049,7 @@ func VStudioBackend::build(const WorkspaceRef workspace) -> BuildState
                 {
                     fs::path relPath = fs::relative(node->fullPath, proj->rootPath);
                     fs::path srcPath = node->fullPath;
-                    fs::path objPath = proj->rootPath / "_obj" / buildTypeFolder / relPath;
+                    fs::path objPath = proj->rootPath / "_obj" / buildTypeFolder(proj->env) / relPath;
 
                     if (node->type == Node::Type::DataFile)
                     {
@@ -1062,7 +1110,7 @@ func VStudioBackend::build(const WorkspaceRef workspace) -> BuildState
                             "/WX",
                             proj->env.buildType == BuildType::Release ? "/MT" : "/MTd",
                             "/std:c++17",
-                            "/Fd\"" + (proj->env.rootPath / "_obj" / buildTypeFolder / "vc141.pdb").string() + "\"",
+                            "/Fd\"" + (proj->env.rootPath / "_obj" / buildTypeFolder(proj->env) / "vc141.pdb").string() + "\"",
                             "/Fo\"" + objPath.string() + "\"",
                             "\"" + srcPath.string() + "\"",
                             //"/I\"" + (env.rootPath / "src").string() + "\""
@@ -1079,7 +1127,7 @@ func VStudioBackend::build(const WorkspaceRef workspace) -> BuildState
                         {
                             string flag = node->type == Node::Type::PchFile ? "/Yc" : "/Yu";
                             args.emplace_back(flag + *pchFile);
-                            auto pchPath = proj->rootPath / "_obj" / buildTypeFolder / (proj->name + ".pch");
+                            auto pchPath = proj->rootPath / "_obj" / buildTypeFolder(proj->env) / (proj->name + ".pch");
                             args.emplace_back(string("/Fp") + pchPath.string());
                         }
 
@@ -1136,7 +1184,7 @@ func VStudioBackend::build(const WorkspaceRef workspace) -> BuildState
             usePch = true;
 
             // Figure out if we need to rebuild the pch.cc file.
-            fs::path pchPath = proj->env.rootPath / "_obj" / buildTypeFolder / "pch.cc";
+            fs::path pchPath = proj->env.rootPath / "_obj" / buildTypeFolder(proj->env) / "pch.cc";
             bool createPch = false;
 
             // If the file doesn't exist, it's obvious that we need to rebuild it.
@@ -1151,7 +1199,7 @@ func VStudioBackend::build(const WorkspaceRef workspace) -> BuildState
 
             if (createPch)
             {
-                if (!buildPchFiles(proj, proj->env.buildType)) return BuildState::Failed;
+                if (!buildPchFiles(proj)) return BuildState::Failed;
             }
 
             auto node = make_unique<Node>(Node::Type::PchFile, move(pchPath));
@@ -1176,7 +1224,7 @@ func VStudioBackend::build(const WorkspaceRef workspace) -> BuildState
         // #todo: Support DLLs
         //
         Lines errorLines;
-        fs::path binPath = proj->rootPath / "_bin" / buildTypeFolder;
+        fs::path binPath = proj->rootPath / "_bin" / buildTypeFolder(proj->env);
         string ext;
 
         switch (proj->appType)

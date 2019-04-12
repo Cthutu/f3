@@ -1,12 +1,10 @@
 [ ] - Edit command should generate dep project files locally
 [ ] - Check that dependencies are libraries
 [ ] - Move include/lib paths code to backend base class
-[X] - Add data support to VStudio projects
-[ ] - Add pch support to VStudio projects
+[X] - Add pch support to VStudio projects
 
 MAJOR MILESTONES
 
-[X] - Add data support
 [ ] - Support DLLs.
 [ ] - Support unit testing.
 [ ] - Support github.

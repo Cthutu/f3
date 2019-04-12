@@ -35,8 +35,9 @@ private:
     func getLibraries(const Project* proj) -> std::vector<std::string>;
     func getLibraryPaths(const Project* proj, BuildType buildType) -> std::vector<std::string>;
 
-    func buildPchFiles(const Project* proj, BuildType buildType) -> bool;
-    func buildDataFiles(const Project* proj, BuildType buildType) -> std::optional<std::vector<std::filesystem::path>>;
+    func buildPchFiles(const Project* proj) -> bool;
+    func buildDataFiles(const Project* proj) -> std::optional<std::vector<std::filesystem::path>>;
+    func buildTypeFolder(const Env& env) -> std::filesystem::path;
 
 private:
     std::filesystem::path m_compiler;
