@@ -914,10 +914,11 @@ func VStudioBackend::buildDataFiles(const Project* proj) -> optional<vector<fs::
                         vector<char> data(dataStream, endDataStream);
                         dataFile.close();
 
-                        for (size_t i = 0; i < data.size(); ++i)
+                        for (size_t i = 0; i < data.size();)
                         {
                             string rowStr = "    ";
-                            for (size_t row = i; row < min(data.size(), 16); ++row, ++i)
+                            size_t endRow = min(data.size(), i + 16);
+                            for (size_t row = i; row < endRow; ++row, ++i)
                             {
                                 rowStr += string("0x") + byteHexStr((u8)data[i]) + ", ";
                             }
