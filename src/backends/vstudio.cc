@@ -906,9 +906,19 @@ func VStudioBackend::buildDataFiles(const Project* proj, BuildType buildType) ->
 
 //----------------------------------------------------------------------------------------------------------------------
 
-func VStudioBackend::buildPchFiles(const Project* proj, BuildType buildType) -> void
+func VStudioBackend::buildPchFiles(const Project* proj, BuildType buildType) -> bool
 {
-
+    optional<string> pchFile = proj->config.tryGet("build.pch");
+    if (pchFile)
+    {
+        fs::path buildTypeFolder = buildType == BuildType::Debug ? "debug" : "release";
+        fs::path pchPath = proj->env.rootPath / "_obj" / buildTypeFolder / "pch.cc";
+        if (!ensurePath(proj->env.cmdLine, pchPath.parent_path())) return false;
+        TextFile pchTextFile{ fs::path(pchPath) };
+        pchTextFile << (string("#include <") + *pchFile + ">\n");
+        pchTextFile.write();
+    }
+    return true;
 }
 
 //----------------------------------------------------------------------------------------------------------------------
@@ -1141,10 +1151,7 @@ func VStudioBackend::build(const WorkspaceRef workspace) -> BuildState
 
             if (createPch)
             {
-                if (!ensurePath(proj->env.cmdLine, proj->rootPath / "_obj" / buildTypeFolder)) return BuildState::Failed;
-                TextFile pchTextFile{ fs::path(pchPath) };
-                pchTextFile << (string("#include <") + *pchFile + ">\n");
-                pchTextFile.write();
+                if (!buildPchFiles(proj, proj->env.buildType)) return BuildState::Failed;
             }
 
             auto node = make_unique<Node>(Node::Type::PchFile, move(pchPath));
