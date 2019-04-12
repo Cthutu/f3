@@ -1123,7 +1123,7 @@ func VStudioBackend::build(const WorkspaceRef workspace) -> BuildState
                         }
 
                         // Check for pre-compiled header
-                        if (usePch)
+                        if (usePch && node->type != Node::Type::DataFile)
                         {
                             string flag = node->type == Node::Type::PchFile ? "/Yc" : "/Yu";
                             args.emplace_back(flag + *pchFile);
