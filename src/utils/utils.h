@@ -25,6 +25,8 @@ func rtrim(std::string& s) -> void;
 func trim(std::string& s) -> void;
 
 func extractSubStr(const std::string& str, char startDelim, char endDelim) -> std::string;
+func hasEnding(const std::string& str, const std::string& ending) -> bool;
+func ensureEnding(const std::string& str, const std::string& ending)->std::string;
 
 func symbolise(const std::string& str) -> std::string;
 func byteHexStr(u8 byte) -> std::string;

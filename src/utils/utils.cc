@@ -231,4 +231,25 @@ func generateGuid() -> string
 }
 
 //----------------------------------------------------------------------------------------------------------------------
+
+func hasEnding(const string& str, const string& ending) -> bool
+{
+    if (str.length() >= ending.length())
+    {
+        return (0 == str.compare(str.length() - ending.length(), ending.length(), ending));
+    }
+    else
+    {
+        return false;
+    }
+}
+
+//----------------------------------------------------------------------------------------------------------------------
+
+func ensureEnding(const string& str, const string& ending) -> string
+{
+    return hasEnding(str, ending) ? str : str + ending;
+}
+
+//----------------------------------------------------------------------------------------------------------------------
 //----------------------------------------------------------------------------------------------------------------------

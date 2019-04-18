@@ -362,6 +362,17 @@ func VStudioBackend::getLibraries(const Project* proj) -> vector<string>
         libs.emplace_back(proj->name + ".lib");
     }
 
+    optional<string> localLibs = proj->config.tryGet("build.libs");
+    if (localLibs)
+    {
+        vector<string> localLibsStrings = split(*localLibs, ";");
+        for (auto& lib : localLibsStrings)
+        {
+            lib = ensureEnding(lib, ".lib");
+        }
+        libs.insert(libs.end(), localLibsStrings.begin(), localLibsStrings.end());
+    }
+
     return libs;
 }
 
