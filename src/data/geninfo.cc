@@ -53,6 +53,9 @@ func TextFile::write() const -> bool
 //----------------------------------------------------------------------------------------------------------------------
 //----------------------------------------------------------------------------------------------------------------------
 
+extern const u8 data_catch_hpp[];
+extern const u64 size_data_catch_hpp;
+
 GenInfo::GenInfo(const CmdLine& cmdLine)
 {
     assert(cmdLine.command() == "new");
@@ -160,6 +163,16 @@ GenInfo::GenInfo(const CmdLine& cmdLine)
         textFiles.back() << "    hello();";
         textFiles.back() << "}";
         textFiles.back() << "";
+
+        // This code assumes that catch.hpp in the data folder uses \n and not \r\n for line breaks.
+        textFiles.emplace_back(testPath / "catch.h");
+        for (u64 i = 0; i < size_data_catch_hpp; )
+        {
+            u64 start = i;
+            while (data_catch_hpp[i] != '\n' && i < size_data_catch_hpp) ++i;
+            textFiles.back() << string(data_catch_hpp + start, data_catch_hpp + i);
+            ++i;
+        }
     }
 }
 
