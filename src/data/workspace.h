@@ -60,8 +60,6 @@ struct Project
     std::unique_ptr<Node>       rootNode;
     AppType                     appType;
     SubsystemType               ssType;
-    Paths                       includePaths;
-    Paths                       libPaths;
 
     struct Dep
     {

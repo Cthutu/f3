@@ -315,6 +315,16 @@ func VStudioBackend::getIncludePaths(const Project* proj) -> vector<string>
     vector<fs::path> incPaths;
 
     //
+    // Add paths from forge.ini
+    //
+    optional<string> incPathsString = proj->config.tryGet("build.incpaths");
+    if (incPathsString)
+    {
+        vector<string> localIncPaths = split(*incPathsString, ";");
+        incPaths.insert(incPaths.end(), localIncPaths.begin(), localIncPaths.end());
+    }
+
+    //
     // Add dependency paths
     //
 
@@ -322,19 +332,16 @@ func VStudioBackend::getIncludePaths(const Project* proj) -> vector<string>
     for (const Project* proj : deps)
     {
         incPaths.emplace_back(fs::canonical(proj->rootPath / "inc"));
-        //incPaths.emplace_back(fs::relative(proj->rootPath / "inc", projPath));
     }
 
     //
     // Add paths
     //
     incPaths.emplace_back(fs::canonical(proj->rootPath / "src"));
-    //incPaths.emplace_back(fs::relative(proj->rootPath / "src", projPath));
 
     if (proj->appType == AppType::Library || proj->appType == AppType::DynamicLibrary)
     {
         incPaths.emplace_back(fs::canonical(proj->rootPath / "inc"));
-        //incPaths.emplace_back(fs::relative(proj->rootPath / "inc", projPath));
     }
 
     //
@@ -385,6 +392,16 @@ func VStudioBackend::getLibraryPaths(const Project* proj, BuildType buildType) -
     string buildString = buildType == BuildType::Debug ? "debug" : "release";
     
     vector<fs::path> libPaths;
+
+    //
+    // Add paths from forge.ini
+    //
+    optional<string> libPathsString = proj->config.tryGet("build.libpaths");
+    if (libPathsString)
+    {
+        vector<string> localLibPaths = split(*libPathsString, ";");
+        libPaths.insert(libPaths.end(), localLibPaths.begin(), localLibPaths.end());
+    }
 
     set<Project*> deps = getProjectCompleteDeps(proj);
     for (const Project* proj : deps)
