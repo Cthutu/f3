@@ -321,7 +321,14 @@ func VStudioBackend::getIncludePaths(const Project* proj) -> vector<string>
     if (incPathsString)
     {
         vector<string> localIncPaths = split(*incPathsString, ";");
-        incPaths.insert(incPaths.end(), localIncPaths.begin(), localIncPaths.end());
+        for (const auto& pathString : localIncPaths)
+        {
+            fs::path p(pathString);
+            incPaths.push_back(
+                p.is_relative()
+                    ? fs::relative(fs::canonical(proj->rootPath / p), projPath)
+                    : p);
+        }
     }
 
     //
@@ -400,7 +407,14 @@ func VStudioBackend::getLibraryPaths(const Project* proj, BuildType buildType) -
     if (libPathsString)
     {
         vector<string> localLibPaths = split(*libPathsString, ";");
-        libPaths.insert(libPaths.end(), localLibPaths.begin(), localLibPaths.end());
+        for (const auto& pathString : localLibPaths)
+        {
+            fs::path p(pathString);
+            libPaths.push_back(
+                p.is_relative()
+                    ? fs::relative(fs::canonical(proj->rootPath / p), projPath)
+                    : p);
+        }
     }
 
     set<Project*> deps = getProjectCompleteDeps(proj);
