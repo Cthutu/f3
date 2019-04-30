@@ -108,15 +108,39 @@ GenInfo::GenInfo(const CmdLine& cmdLine)
     textFiles.back() << stringFormat("type = {0}", typeString);
     if (subsystemType == SubsystemType::Windows)
     {
+        textFiles.back() << "# Supported sub-system types are:";
         textFiles.back() << "system = windows";
     }
+    else
+    {
+        textFiles.back() << "# Uncomment this to change the subsystem.  Supported types are:";
+    }
+    textFiles.back() << "#     windows";
+    textFiles.back() << "#     console (default)";
     textFiles.back() << "";
     textFiles.back() << "[build]";
     textFiles.back() << "# Uncomment this to add libraries to link with.";
     textFiles.back() << "# libs = ";
     textFiles.back() << "# Uncomment this to add pre-compiled header support.";
     textFiles.back() << "# pch = ";
+    textFiles.back() << "# Uncomment this to add include paths.";
+    textFiles.back() << "# incpaths = ";
+    textFiles.back() << "# Uncomment this to add library paths.";
+    textFiles.back() << "# libpaths = ";
     textFiles.back() << "";
+#if OS_WIN32
+    textFiles.back() << "# Added defines for windows builds in this section in the form 'KEY = VALUE'.";
+    textFiles.back() << "[win32]";
+    textFiles.back() << "";
+    textFiles.back() << "# Added defines for windows debug builds in this section in the form 'KEY = VALUE'.";
+    textFiles.back() << "[win32.debug]";
+    textFiles.back() << "";
+    textFiles.back() << "# Added defines for windows release builds in this section in the form 'KEY = VALUE'.";
+    textFiles.back() << "[win32.release]";
+    textFiles.back() << "";
+#endif
+    textFiles.back() << "# Add project dependencies in the form 'TYPE:NAME = PATH'";
+    textFiles.back() << "# Supported types are just 'local' for now, and path is relative to this project's root path.";
     textFiles.back() << "[dependencies]";
     textFiles.back() << "";
 

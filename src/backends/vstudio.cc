@@ -450,6 +450,35 @@ func VStudioBackend::generatePrj(const ProjectRef proj) -> bool
     XmlNode* compileGroup = nullptr;
 
     buildDataFiles(proj.get());
+
+    //
+    // Process the defines
+    //
+    vector<string> debugDefines;
+    vector<string> releaseDefines;
+    for (const auto&[key, value] : proj->defines["common"])
+    {
+        debugDefines.push_back(key + "=\"" + value + "\"");
+        releaseDefines.push_back(key + "=\"" + value + "\"");
+    }
+    for (const auto&[key, value] : proj->defines["debug"])
+    {
+        debugDefines.push_back(key + "=\"" + value + "\"");
+    }
+    for (const auto&[key, value] : proj->defines["release"])
+    {
+        releaseDefines.push_back(key + "=\"" + value + "\"");
+    }
+    debugDefines.push_back("_DEBUG");
+    releaseDefines.push_back("NDEBUG");
+
+#if OS_WIN32
+    debugDefines.push_back("WIN32");
+    releaseDefines.push_back("WIN32");
+#endif
+
+    debugDefines.push_back("%(PreprocessorDefinitions)");
+    releaseDefines.push_back("%(PreprocessorDefinitions)");
     
     rootNode
         .tag("Project", { { "DefaultTargets", "Build" }, { "ToolsVersion", "15.0" }, 
@@ -525,7 +554,7 @@ func VStudioBackend::generatePrj(const ProjectRef proj) -> bool
                     .text("PrecompiledHeader", {}, "NotUsing")
                     .text("WarningLevel", {}, "Level3")
                     .text("TreatWarningAsError", {}, "true")
-                    .text("PreprocessorDefinitions", {}, "_CRT_SECURE_NO_WARNINGS;_DEBUG;WIN32;%(PreprocessorDefinitions)")      // #todo: Support non-console apps, libs, and dlls
+                    .text("PreprocessorDefinitions", {}, join(debugDefines, ";"))      // #todo: Support non-console apps, libs, and dlls
                     .text("AdditionalIncludeDirectories", {}, string(includeDirectories))
                     .text("Optimization", {}, "Disabled")
                     .text("RuntimeLibrary", {}, "MultiThreadedDebug")
@@ -546,7 +575,7 @@ func VStudioBackend::generatePrj(const ProjectRef proj) -> bool
                     .text("PrecompiledHeader", {}, "NotUsing")
                     .text("WarningLevel", {}, "Level3")
                     .text("TreatWarningAsError", {}, "true")
-                    .text("PreprocessorDefinitions", {}, "_CRT_SECURE_NO_WARNINGS;NDEBUG;WIN32;%(PreprocessorDefinitions)")      // #todo: Support non-console apps, libs, and dlls
+                    .text("PreprocessorDefinitions", {}, join(releaseDefines, ";"))      // #todo: Support non-console apps, libs, and dlls
                     .text("AdditionalIncludeDirectories", {}, string(includeDirectories))
                     .text("Optimization", {}, "Full")
                     .text("FunctionLevelLinking", {}, "true")
@@ -1178,6 +1207,27 @@ func VStudioBackend::build(const WorkspaceRef workspace) -> BuildState
                         for (const auto& path : m_includePaths)
                         {
                             args.emplace_back(string("/I\"") + path.string() + "\"");
+                        }
+
+                        // Add defines
+                        for (const auto&[key, value] : proj->defines.at(string("common")))
+                        {
+                            args.push_back(string("/D") + key + "=\"" + value + "\"");
+                        }
+                        for (const auto&[key, value] : proj->defines.at(string(proj->env.buildType == BuildType::Debug ? "debug" : "release")))
+                        {
+                            args.push_back(string("/D") + key + "=\"" + value + "\"");
+                        }
+#if OS_WIN32
+                        args.push_back("/DWIN32");
+#endif
+                        if (proj->env.buildType == BuildType::Debug)
+                        {
+                            args.push_back("/D_DEBUG");
+                        }
+                        else
+                        {
+                            args.push_back("/DNDEBUG");
                         }
 
                         // Check for verbosity.

@@ -120,6 +120,9 @@ func buildProject(Workspace& ws, const Env& env) -> bool
     p->rootPath = env.rootPath;
     p->config.readIni(env.cmdLine, env.rootPath / "forge.ini");
 
+    //
+    // Get project name
+    //
     auto maybeName = p->config.tryGet("info.name");
     if (maybeName)
     {
@@ -127,6 +130,9 @@ func buildProject(Workspace& ws, const Env& env) -> bool
     }
     else return error(env.cmdLine, stringFormat("Project at `{0}` doesn't have a name (add info.name entry to forge.ini).", env.rootPath));
 
+    //
+    // Generate extra information about project
+    //
     p->guid = generateGuid();
 
     p->rootNode = make_unique<Node>(Node::Type::Root, fs::path(p->rootPath));
@@ -164,6 +170,21 @@ func buildProject(Workspace& ws, const Env& env) -> bool
         return error(env.cmdLine, "Invalid application type (info.type).");
     }
 
+    //
+    // Scan for defines
+    //
+#if OS_WIN32
+    string section = "win32";
+#else
+#   error Write define scanning code for your platform
+#endif
+    p->defines["common"] = p->config.fetchSection(section);
+    p->defines["debug"] = p->config.fetchSection(section + ".debug");
+    p->defines["release"] = p->config.fetchSection(section + ".release");
+
+    //
+    // Scan for source code in project
+    //
     scanSrc(p->rootNode, p->rootPath / "src", Node::Type::SourceFolder);
     scanSrc(p->rootNode, p->rootPath / "data", Node::Type::DataFolder);
     if (p->appType == AppType::Library || p->appType == AppType::DynamicLibrary)
@@ -172,6 +193,9 @@ func buildProject(Workspace& ws, const Env& env) -> bool
         scanSrc(p->rootNode, p->rootPath / "test", Node::Type::TestFolder);
     }
 
+    //
+    // Get a list of dependencies
+    //
     if (!processDeps(ws, env, p)) return false;
 
     ws.projects.push_back(move(p));

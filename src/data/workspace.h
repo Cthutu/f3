@@ -52,14 +52,19 @@ using Paths = std::vector<std::filesystem::path>;
 
 struct Project
 {
-    Env                         env;
-    std::filesystem::path       rootPath;       // Path of project (intended or actual)
-    std::string                 name;
-    Config                      config;         // Project's forge.ini file.
-    std::string                 guid;
-    std::unique_ptr<Node>       rootNode;
-    AppType                     appType;
-    SubsystemType               ssType;
+    Env                             env;
+    std::filesystem::path           rootPath;       // Path of project (intended or actual)
+    std::string                     name;
+    Config                          config;         // Project's forge.ini file.
+    std::string                     guid;
+    std::unique_ptr<Node>           rootNode;
+    AppType                         appType;
+    SubsystemType                   ssType;
+
+    using DefinePair = pair<string, string>;
+    using Defines = vector<DefinePair>;
+    
+    map<string, Defines>            defines;
 
     struct Dep
     {
