@@ -106,17 +106,17 @@ GenInfo::GenInfo(const CmdLine& cmdLine)
     textFiles.back() << "[info]";
     textFiles.back() << stringFormat("name = {0}", projName);
     textFiles.back() << stringFormat("type = {0}", typeString);
+    textFiles.back() << "# Uncomment this to change the subsystem.  Supported types are:";
+    textFiles.back() << "#     windows";
+    textFiles.back() << "#     console (default)";
     if (subsystemType == SubsystemType::Windows)
     {
-        textFiles.back() << "# Supported sub-system types are:";
         textFiles.back() << "system = windows";
     }
     else
     {
-        textFiles.back() << "# Uncomment this to change the subsystem.  Supported types are:";
+		textFiles.back() << "#system = console";
     }
-    textFiles.back() << "#     windows";
-    textFiles.back() << "#     console (default)";
     textFiles.back() << "";
     textFiles.back() << "[build]";
     textFiles.back() << "# Uncomment this to add libraries to link with.";
