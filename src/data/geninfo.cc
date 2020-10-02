@@ -111,11 +111,11 @@ GenInfo::GenInfo(const CmdLine& cmdLine)
     textFiles.back() << "#     console (default)";
     if (subsystemType == SubsystemType::Windows)
     {
-        textFiles.back() << "system = windows";
+        textFiles.back() << "subsystem = windows";
     }
     else
     {
-		textFiles.back() << "#system = console";
+		textFiles.back() << "#subsystem = console";
     }
     textFiles.back() << "";
     textFiles.back() << "[build]";
