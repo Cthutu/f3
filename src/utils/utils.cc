@@ -252,4 +252,49 @@ func ensureEnding(const string& str, const string& ending) -> string
 }
 
 //----------------------------------------------------------------------------------------------------------------------
+
+func expand(const std::string& text) -> string
+{
+    std::string out;
+
+    for (auto it = text.begin(); it != text.end();)
+    {
+        if (*it == '$')
+        {
+            std::string macro;
+            ++it;
+            while ((*it >= 'a' && *it <= 'z') ||
+                (*it >= 'A' && *it <= 'Z') ||
+                (*it == '_'))
+            {
+                macro += *it;
+                ++it;
+            }
+            if (macro.empty())
+            {
+                out += '$';
+                ++it;
+            }
+            else
+            {
+                char* buffer;
+                size_t size;
+                if (!_dupenv_s(&buffer, &size, macro.c_str()))
+                {
+                    out += buffer;
+                    free(buffer);
+                }
+            }
+        }
+        else
+        {
+            out += *it;
+            ++it;
+        }
+    }
+
+    return out;
+}
+
+//----------------------------------------------------------------------------------------------------------------------
 //----------------------------------------------------------------------------------------------------------------------

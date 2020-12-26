@@ -323,7 +323,7 @@ func VStudioBackend::getIncludePaths(const Project* proj) -> vector<string>
         vector<string> localIncPaths = split(*incPathsString, ";");
         for (const auto& pathString : localIncPaths)
         {
-            fs::path p(pathString);
+            fs::path p(expand(pathString));
             incPaths.push_back(
                 p.is_relative()
                     ? fs::relative(fs::canonical(proj->rootPath / p), projPath)
@@ -409,7 +409,7 @@ func VStudioBackend::getLibraryPaths(const Project* proj, BuildType buildType) -
         vector<string> localLibPaths = split(*libPathsString, ";");
         for (const auto& pathString : localLibPaths)
         {
-            fs::path p(pathString);
+            fs::path p(expand(pathString));
             libPaths.push_back(
                 p.is_relative()
                     ? fs::relative(fs::canonical(proj->rootPath / p), projPath)
